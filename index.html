@@ -345,6 +345,7 @@ function form(o){
     if(!confirm('Diesen Eintrag löschen?'))return;
     const r=readings.find(x=>x.id===edit);
     readings=readings.filter(x=>x.id!==edit);
+    await markDeleted([edit]);
     if(r&&r.photoId){await kvDel('p_'+r.photoId);delete photoCache[r.photoId];}
     await saveReadings();closeLayer();render();
   };
@@ -401,6 +402,7 @@ function meterDialog(){
     const cnt=readings.filter(r=>r.meterId===m.id).length;
     if(!confirm(`„${m.name}“ löschen${cnt?` inkl. ${cnt} Einträgen und Fotos`:''}?`))return;
     for(const r of readings.filter(r=>r.meterId===m.id)){if(r.photoId)await kvDel('p_'+r.photoId);}
+    await markDeleted([m.id,...readings.filter(r=>r.meterId===m.id).map(r=>r.id)]);
     readings=readings.filter(r=>r.meterId!==m.id);meters=meters.filter(x=>x.id!==m.id);
     await saveMeters();await saveReadings();meterDialog();
   });
@@ -457,22 +459,37 @@ $('#imp').onchange=async e=>{
   }catch(err){alert('Die Datei ist kein gültiges Backup.');}
 };
 
+
+/* Abgleich mit daten.json (liegt neben der App, z. B. auf GitHub Pages): fehlende Zähler/Ablesungen werden ergänzt */
+async function syncRemote(){
+  if(window.SEED)return;
+  try{
+    const et=await kvGet('daten_etag');
+    const have=meters&&meters.length;
+    const r=await fetch('daten.json',{cache:'no-cache',headers:(et&&have)?{'If-None-Match':et}:{}});
+    if(r.status===304||!r.ok)return;
+    const d=await r.json();
+    if(!Array.isArray(d.meters)||!Array.isArray(d.readings))return;
+    const del=new Set((await kvGet('deleted'))||[]);
+    meters=meters||[];let changed=false;
+    for(const m of d.meters)if(!del.has(m.id)&&!meters.some(x=>x.id===m.id)){meters.push(m);changed=true;}
+    for(const x of d.readings){
+      if(del.has(x.id)||del.has(x.meterId)||readings.some(y=>y.id===x.id))continue;
+      readings.push(x);changed=true;
+      if(x.photoId&&d.photos&&d.photos[x.photoId])await kvSet('p_'+x.photoId,d.photos[x.photoId]);
+    }
+    if(changed){await saveMeters();await saveReadings();}
+    const e=r.headers.get('ETag');if(e)await kvSet('daten_etag',e);
+  }catch(e){}
+}
+async function markDeleted(ids){await kvSet('deleted',[...new Set([...(((await kvGet('deleted'))||[])),...ids])]);}
+
 /* ---------- Start ---------- */
 (async function init(){
   persistent=await openDB();
   meters=(await kvGet('meters'))||null;
   readings=(await kvGet('readings'))||[];
-  if(!meters&&!window.SEED){
-    try{
-      const r=await fetch('daten.json',{cache:'no-store'});
-      if(r.ok){const d=await r.json();
-        if(Array.isArray(d.meters)&&Array.isArray(d.readings)){
-          meters=d.meters;readings=d.readings;
-          for(const id in (d.photos||{}))await kvSet('p_'+id,d.photos[id]);
-          await saveMeters();await saveReadings();
-        }}
-    }catch(e){}
-  }
+  await syncRemote();
   if(!meters){
     meters=[{id:uid(),name:'Strom',unit:'kWh'},{id:uid(),name:'Gas',unit:'m³'},{id:uid(),name:'Wasser',unit:'m³'}];
     await saveMeters();
