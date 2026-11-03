@@ -65,6 +65,17 @@ svg text{fill:var(--mut);font-size:11px}
 svg text.val{fill:var(--txt);font-weight:600}
 .prog{font-size:13px;color:var(--mut);margin-bottom:6px}
 @media(max-width:520px){.hm{display:none}}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;-webkit-overflow-scrolling:touch}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:20px;padding:8px 14px;white-space:nowrap;font-size:15px}
+.chip.on{background:var(--acc);color:var(--acc-t);border-color:var(--acc);font-weight:600}
+.chips.cats .chip{font-size:16px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin:4px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+tr.sum td{font-weight:700;border-top:2px solid var(--line)}
+th .mut{font-weight:400;text-transform:none}
+details.det{border-top:1px solid var(--line);padding:8px 0}
+details.det summary{cursor:pointer;font-weight:600;padding:4px 0}
+.mc{cursor:default}
 .tools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
@@ -152,70 +163,127 @@ function shrink(file,max=1280,q=.8){return new Promise((res,rej)=>{
   img.src=url;
 });}
 
-/* ---------- Übersicht ---------- */
+/* ---------- Auswertung ---------- */
+const CATS=['Strom','Wärme','Wasser','Gas'];
+const catOf=m=>/strom/i.test(m.name)?'Strom':/wärme|waerme/i.test(m.name)?'Wärme':/gas/i.test(m.name)&&!/wasser/i.test(m.name)?'Gas':/wasser/i.test(m.name)?'Wasser':'Sonstige';
+const CATICON={Strom:'⚡',Wärme:'🔥',Wasser:'💧',Gas:'🟦',Sonstige:'📟'};
+let selYear='alle',selCat=null;
+const MONTHN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const dim=ym=>{const [y,m]=ym.split('-').map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate();};
+
+/* Verbrauch je Kalendermonat: Differenz zwischen zwei Ablesungen wird gleichmäßig auf die Tage verteilt */
+function monthly(meterId){
+  const s=series(meterId),out={};
+  for(let i=1;i<s.length;i++){
+    const r=s[i];if(r.diff==null||r.neg||!(r.days>0))continue;
+    const d0=dayNum(s[i-1].date),d1=dayNum(r.date),per=r.diff/r.days;
+    for(let d=d0;d<d1;d++){
+      const ym=new Date(d*86400000).toISOString().slice(0,7);
+      const o=out[ym]||(out[ym]={v:0,days:0});o.v+=per;o.days++;
+    }
+  }
+  return out;
+}
+function monthList(){
+  const set=new Set();
+  meters.forEach(m=>Object.keys(monthly(m.id)).forEach(k=>set.add(k)));
+  return [...set].sort();
+}
+function years(){
+  const y=new Set();readings.forEach(r=>y.add(r.date.slice(0,4)));return [...y].sort();
+}
+const shortN=m=>m.name.replace(/\s*\(.*\)/,'').replace(/^(Strom|Wärme|Gas)\s+/,'');
+const fmtV=(v,u)=>v==null?'–':fmt(v,Math.abs(v)<10?2:Math.abs(v)<100?1:0);
+
 async function render(){
   const main=$('#main');
   if(!meters.length){main.innerHTML='<div class="empty">Noch keine Zähler angelegt.</div>';return;}
-  if(!meterById(selMeter))selMeter=meters[0].id;
+  const ys=years();
+  if(selYear!=='alle'&&!ys.includes(selYear))selYear='alle';
+  const present=[...new Set(meters.map(catOf))].sort((a,b)=>(CATS.indexOf(a)+9)%9-(CATS.indexOf(b)+9)%9);
+  if(!selCat||!present.includes(selCat))selCat=present[0];
+  const cm=meters.filter(m=>catOf(m)===selCat);
+  const all=monthList();
+  let months=selYear==='alle'?all:Array.from({length:12},(_,i)=>`${selYear}-${String(i+1).padStart(2,'0')}`);
+  const mon={};cm.forEach(m=>mon[m.id]=monthly(m.id));
+  const inYear=ym=>selYear==='alle'||ym.startsWith(selYear);
+  const tot=m=>Object.entries(mon[m.id]).filter(([k])=>inYear(k)).reduce((a,[,o])=>a+o.v,0);
+  const cov=m=>Object.entries(mon[m.id]).filter(([k])=>inYear(k)).reduce((a,[,o])=>a+o.days,0);
   let h='';
   if(!persistent)h+='<div class="panel warn">⚠️ Speicher im Browser nicht verfügbar – Daten gehen beim Schließen verloren. Bitte regelmäßig unter „Daten“ sichern.</div>';
+  h+='<div class="chips">'+['alle',...ys].map(y=>`<button class="chip ${y===selYear?'on':''}" data-y="${y}">${y==='alle'?'Alle Jahre':y}</button>`).join('')+'</div>';
+  h+='<div class="chips cats">'+present.map(c=>`<button class="chip ${c===selCat?'on':''}" data-c="${c}">${CATICON[c]||''} ${c}</button>`).join('')+'</div>';
+  /* Kennzahlen */
   h+='<div class="cards">';
-  for(const m of meters){
-    const s=series(m.id),last=s[s.length-1];
-    h+=`<button class="mc ${m.id===selMeter?'sel':''}" style="--col:${colorOf(m)}" data-m="${m.id}">
-      <div class="n"><span class="dot"></span>${esc(m.name)}</div>
-      <div class="v">${last?fmt(last.value,2)+' <small>'+esc(m.unit)+'</small>':'–'}</div>
-      <div class="s">${last?'Stand '+fmtDate(last.date)+(last.diff!=null?' · +'+fmt(last.diff,2)+' '+esc(m.unit):''):'noch keine Werte'}</div></button>`;
+  for(const m of cm){
+    const s=series(m.id),last=s[s.length-1],t=tot(m),d=cov(m);
+    h+=`<div class="mc" style="--col:${colorOf(m)}"><div class="n"><span class="dot"></span>${esc(m.name)}</div>
+      <div class="v">${d?fmtV(t)+' <small>'+esc(m.unit)+'</small>':'–'}</div>
+      <div class="s">Verbrauch ${selYear==='alle'?'gesamt':selYear}${d&&d<330&&selYear!=='alle'?' (nur '+d+' Tage erfasst)':''}</div>
+      <div class="s">${d?'Ø '+fmtV(t/d*30.4375)+' '+esc(m.unit)+' / Monat':''}</div>
+      <div class="s">Stand ${last?fmt(last.value,m.unit==='m³'?3:1)+' '+esc(m.unit)+' · '+fmtDate(last.date):'–'}</div></div>`;
   }
   h+='</div>';
-  const m=meterById(selMeter),s=series(m.id);
-  h+=`<div class="panel"><h2 style="color:${colorOf(m)}">${esc(m.name)}</h2>`;
-  if(!s.length){h+='<div class="empty">Noch keine Zählerstände. Mit „📷 Fotos hinzufügen“ starten.</div></div>';main.innerHTML=h;bind();return;}
-  const diffs=s.filter(x=>x.diff!=null&&!x.neg);
-  const yr=new Date().getFullYear().toString();
-  const thisYear=diffs.filter(x=>x.date.startsWith(yr)).reduce((a,x)=>a+x.diff,0);
-  const totDays=diffs.reduce((a,x)=>a+x.days,0),totDiff=diffs.reduce((a,x)=>a+x.diff,0);
-  const perMonth=totDays>0?totDiff/totDays*30.4375:null;
-  const last=s[s.length-1];
-  h+=`<div class="stats">
-    <div class="stat"><b>${fmt(last.value,2)} ${esc(m.unit)}</b><span>Letzter Stand</span></div>
-    <div class="stat"><b>${last.diff!=null?fmt(last.diff,2)+' '+esc(m.unit):'–'}</b><span>Letzter Verbrauch</span></div>
-    <div class="stat"><b>${fmt(perMonth,1)} ${esc(m.unit)}</b><span>Ø pro Monat</span></div>
-    <div class="stat"><b>${fmt(thisYear,1)} ${esc(m.unit)}</b><span>Verbrauch ${yr}</span></div></div>`;
-  h+=chart(s,m);
-  h+='</div><div class="panel"><h2>Alle Stände</h2><div class="tw"><table><thead><tr><th>Datum</th><th>Stand</th><th>Verbrauch</th><th class="hm">Tage</th><th class="hm">Ø/Tag</th><th>Foto</th></tr></thead><tbody>';
-  const rows=s.slice().reverse();
-  for(const r of rows){
-    h+=`<tr class="row" data-r="${r.id}"><td>${fmtDate(r.date)}${r.reset?' <span class="mut" title="Zählerwechsel">🔄</span>':''}</td>
-      <td>${fmt(r.value,2)}</td>
-      <td class="${r.neg?'warn':''}">${r.diff!=null?(r.neg?'⚠ ':'+')+fmt(r.diff,2):'–'}</td>
-      <td class="mut hm">${r.days!=null?fmt(r.days,0):'–'}</td>
-      <td class="mut hm">${r.perDay!=null?fmt(r.perDay,2):'–'}</td>
-      <td>${r.photoId?`<img class="thumb" data-p="${r.photoId}" alt="">`:''}</td></tr>`;
+  /* Diagramm */
+  if(selCat==='Wasser'){
+    for(const m of cm)h+=`<div class="panel"><h2 style="color:${colorOf(m)}">💧 ${esc(m.name)} – pro Monat${selYear==='alle'?'':' '+selYear}</h2>`+stackChart([m],mon,months)+'</div>';
+  }else h+=`<div class="panel"><h2>${CATICON[selCat]||''} ${selCat} – Verbrauch pro Monat${selYear==='alle'?'':' '+selYear}</h2>`+stackChart(cm,mon,months)+'</div>';
+  /* Monatstabelle */
+  h+=`<div class="panel"><h2>Monatsübersicht</h2><div class="tw"><table><thead><tr><th>Monat</th>${cm.map(m=>`<th>${esc(shortN(m))}<br><span class="mut">${esc(m.unit)}</span></th>`).join('')}</tr></thead><tbody>`;
+  for(const ym of months){
+    const any=cm.some(m=>mon[m.id][ym]);
+    const [y,mo]=ym.split('-');
+    h+=`<tr class="${any?'':'mut'}"><td>${MONTHN[+mo-1]} ${selYear==='alle'?y:''}</td>`+cm.map(m=>{
+      const o=mon[m.id][ym];if(!o)return '<td>–</td>';
+      const part=o.days<dim(ym)*0.97;
+      return `<td title="${part?'nur '+o.days+' von '+dim(ym)+' Tagen erfasst':''}">${part?'<span class="mut">~</span>':''}${fmtV(o.v)}</td>`;
+    }).join('')+'</tr>';
   }
-  h+='</tbody></table></div><div class="mut" style="font-size:13px;margin-top:8px">Zeile antippen zum Bearbeiten. ⚠ = Stand niedriger als zuvor (Zählerwechsel? Dann beim Eintrag „Zähler getauscht“ ankreuzen).</div></div>';
+  h+=`<tr class="sum"><td>Summe</td>${cm.map(m=>`<td>${cov(m)?fmtV(tot(m)):'–'}</td>`).join('')}</tr></tbody></table></div>
+    <div class="mut" style="font-size:12px;margin-top:8px">Monatswerte werden aus den Ablesungen auf die Tage verteilt (~ = Monat nur teilweise abgedeckt).</div></div>`;
+  /* Einzelne Ablesungen */
+  h+='<div class="panel"><h2>Ablesungen</h2>';
+  for(const m of cm){
+    const s=series(m.id).filter(r=>selYear==='alle'||r.date.startsWith(selYear));
+    h+=`<details class="det" ${cm.length===1?'open':''}><summary style="color:${colorOf(m)}">${esc(m.name)} <span class="mut">(${s.length})</span></summary>`;
+    if(!s.length){h+='<div class="empty">Keine Ablesungen in diesem Zeitraum.</div></details>';continue;}
+    h+='<div class="tw"><table><thead><tr><th>Datum</th><th>Stand</th><th>Verbrauch</th><th class="hm">Tage</th><th>Foto</th></tr></thead><tbody>';
+    for(const r of s.slice().reverse()){
+      h+=`<tr class="row" data-r="${r.id}"><td>${fmtDate(r.date)}${r.reset?' 🔄':''}${/unsicher/i.test(r.note||'')?' <span class="warn" title="'+esc(r.note)+'">❓</span>':''}</td>
+        <td>${fmt(r.value,m.unit==='m³'?3:1)}</td>
+        <td class="${r.neg?'warn':''}">${r.diff!=null?(r.neg?'⚠ ':'+')+fmt(r.diff,m.unit==='m³'?3:1):'–'}</td>
+        <td class="mut hm">${r.days!=null?fmt(r.days,0):'–'}</td>
+        <td>${r.photoId?`<img class="thumb" data-p="${r.photoId}" alt="">`:''}</td></tr>`;
+    }
+    h+='</tbody></table></div></details>';
+  }
+  h+='<div class="mut" style="font-size:13px;margin-top:8px">Zeile antippen zum Bearbeiten · ❓ = unsicher abgelesen · ⚠ = Stand niedriger als zuvor (Zählerwechsel? Dann beim Eintrag „Zähler getauscht“ ankreuzen).</div></div>';
   main.innerHTML=h;bind();
   document.querySelectorAll('img.thumb').forEach(async im=>{const p=await getPhoto(im.dataset.p);if(p)im.src=p;else im.remove();});
 }
 
-function chart(s,m){
-  const d=s.filter(x=>x.diff!=null&&!x.neg).slice(-12);
-  if(!d.length)return '<div class="mut" style="margin:6px 0">Diagramm erscheint ab dem zweiten Wert.</div>';
-  const W=600,H=220,L=8,R=8,T=22,B=34,n=d.length,bw=(W-L-R)/n,max=Math.max(...d.map(x=>x.diff))||1;
-  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Verbrauch je Zeitraum">`;
-  d.forEach((x,i)=>{
-    const bh=(H-T-B)*(x.diff/max),x0=L+i*bw+bw*.15,w=bw*.7,y=H-B-bh;
-    const [yy,mm]=x.date.split('-');
-    svg+=`<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(bh,1)}" rx="4" fill="${colorOf(m)}"/>
-      <text class="val" x="${x0+w/2}" y="${y-5}" text-anchor="middle">${fmt(x.diff,x.diff>=100?0:1)}</text>
-      <text x="${x0+w/2}" y="${H-B+15}" text-anchor="middle">${mm}/${yy.slice(2)}</text>`;
+function stackChart(cm,mon,months){
+  const vals=months.map(ym=>cm.reduce((a,m)=>a+(mon[m.id][ym]?mon[m.id][ym].v:0),0));
+  const max=Math.max(...vals,0);
+  if(!(max>0))return '<div class="mut" style="margin:6px 0">Noch keine Verbrauchswerte – es werden mindestens zwei Ablesungen benötigt.</div>';
+  const n=months.length,W=600,H=230,L=6,R=6,T=22,B=34,bw=(W-L-R)/n;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Verbrauch pro Monat">`;
+  months.forEach((ym,i)=>{
+    let y=H-B;const x0=L+i*bw+bw*.14,w=bw*.72;
+    cm.forEach(m=>{const o=mon[m.id][ym];if(!o)return;const bh=(H-T-B)*o.v/max;y-=bh;
+      svg+=`<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(bh,.5)}" fill="${colorOf(m)}" ${o.days<dim(ym)*0.97?'opacity=".55"':''}><title>${esc(m.name)} ${ym}: ${fmtV(o.v)} ${esc(m.unit)}</title></rect>`;});
+    const [yy,mm]=ym.split('-');
+    if(vals[i]>0)svg+=`<text class="val" x="${x0+w/2}" y="${y-4}" text-anchor="middle">${fmtV(vals[i])}</text>`;
+    svg+=`<text x="${x0+w/2}" y="${H-B+14}" text-anchor="middle">${n>14?mm+'/'+yy.slice(2):MONTHN[+mm-1]}</text>`;
   });
   svg+=`<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--line)"/></svg>`;
-  return `<div class="mut" style="font-size:13px">Verbrauch je Ablesezeitraum (${esc(m.unit)}), letzte ${d.length}</div>`+svg;
+  const leg=cm.length>1?'<div class="legend">'+cm.map(m=>`<span><i style="background:${colorOf(m)}"></i>${esc(shortN(m))}</span>`).join('')+'</div>':'';
+  return svg+leg+'<div class="mut" style="font-size:12px">Einheit: '+[...new Set(cm.map(m=>m.unit))].join(' / ')+' · blasse Balken = Monat nur teilweise erfasst</div>';
 }
 
 function bind(){
-  document.querySelectorAll('.mc').forEach(b=>b.onclick=()=>{selMeter=b.dataset.m;render();});
+  document.querySelectorAll('[data-y]').forEach(b=>b.onclick=()=>{selYear=b.dataset.y;render();});
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{selCat=b.dataset.c;render();});
   document.querySelectorAll('tr.row').forEach(tr=>tr.onclick=e=>{
     if(e.target.classList.contains('thumb')){showPhoto(e.target.src);return;}
     editReading(tr.dataset.r);
@@ -279,7 +347,7 @@ function form(o){
     const val=parseNum($('#fv').value);
     if(val==null){alert('Bitte einen Zählerstand eingeben.');return;}
     const rec={meterId:$('#fm').value,date:$('#fd').value||today(),value:val,note:$('#fn').value.trim(),reset:$('#fr').checked};
-    lastMeterUsed=rec.meterId;selMeter=rec.meterId;
+    lastMeterUsed=rec.meterId;selMeter=rec.meterId;selCat=catOf(meterById(rec.meterId));
     if(edit){
       const r=readings.find(x=>x.id===edit);Object.assign(r,rec);
     }else{
