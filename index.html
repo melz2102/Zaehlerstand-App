@@ -462,6 +462,17 @@ $('#imp').onchange=async e=>{
   persistent=await openDB();
   meters=(await kvGet('meters'))||null;
   readings=(await kvGet('readings'))||[];
+  if(!meters&&!window.SEED){
+    try{
+      const r=await fetch('daten.json',{cache:'no-store'});
+      if(r.ok){const d=await r.json();
+        if(Array.isArray(d.meters)&&Array.isArray(d.readings)){
+          meters=d.meters;readings=d.readings;
+          for(const id in (d.photos||{}))await kvSet('p_'+id,d.photos[id]);
+          await saveMeters();await saveReadings();
+        }}
+    }catch(e){}
+  }
   if(!meters){
     meters=[{id:uid(),name:'Strom',unit:'kWh'},{id:uid(),name:'Gas',unit:'m³'},{id:uid(),name:'Wasser',unit:'m³'}];
     await saveMeters();
