@@ -1,552 +1,401 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Zähler"/>
-<meta name="theme-color" content="#06090f"/>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Zählerstände</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-body{background:#06090f;color:#e2e8f0;font-family:-apple-system,'Segoe UI',sans-serif;overscroll-behavior:none;min-height:100vh;}
-input,select,button{font-family:inherit;}
-button{cursor:pointer;}
-.tabs::-webkit-scrollbar{display:none;}
+:root{
+  --bg:#f5f6f4; --card:#fff; --txt:#1d2421; --mut:#6b7570; --line:#e1e5e2;
+  --acc:#2f6f5e; --acc-t:#fff; --warn:#b45309; --bad:#b42318;
+  --c0:#2f6f5e; --c1:#c2701a; --c2:#2c6fb0; --c3:#8a4fa3; --c4:#b23a48; --c5:#5d7a2a;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#141816;--card:#1e2421;--txt:#e8ece9;--mut:#93a09a;--line:#2f3833;--acc:#5fb59d;--acc-t:#0d1512;--warn:#e0a050;--bad:#f08a80;
+  --c0:#5fb59d;--c1:#e0a050;--c2:#6aa8e0;--c3:#c08ad6;--c4:#e8808c;--c5:#9cbf5a;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{display:flex;align-items:center;gap:10px;padding:14px 16px;padding-top:max(14px,env(safe-area-inset-top));position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--line)}
+header h1{font-size:20px;margin:0;flex:1}
+main{max-width:860px;margin:0 auto;padding:14px 14px 110px}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--txt);padding:9px 14px;border-radius:10px}
+.btn.pri{background:var(--acc);color:var(--acc-t);border-color:var(--acc);font-weight:600}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:6px 10px;font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:16px}
+.mc{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;color:var(--txt)}
+.mc.sel{border-color:var(--col)}
+.mc .n{display:flex;align-items:center;gap:8px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--col);display:inline-block}
+.mc .v{font-size:22px;font-weight:700;margin-top:6px}
+.mc .s{color:var(--mut);font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.panel h2{font-size:17px;margin:0 0 10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--bg);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+tr.row{cursor:pointer}
+.tw{overflow-x:auto}
+.thumb{width:38px;height:38px;object-fit:cover;border-radius:6px;vertical-align:middle;border:1px solid var(--line)}
+.warn{color:var(--warn)}
+.mut{color:var(--mut)}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}
+.fab{position:fixed;right:16px;bottom:max(16px,env(safe-area-inset-bottom));z-index:6;border-radius:30px;padding:14px 20px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.modal .box{background:var(--card);width:100%;max-width:560px;max-height:94vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+@media(min-width:600px){.modal{align-items:center}.modal .box{border-radius:18px}}
+.modal h3{margin:0 0 10px;font-size:18px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input[type=text],input[type=date],input[type=number],select,textarea{width:100%;font:inherit;font-size:17px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--txt)}
+.photo{width:100%;max-height:46vh;object-fit:contain;background:#000;border-radius:10px;display:block}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.row2 .btn{flex:1;min-width:110px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:15px;color:var(--txt)}
+.chk input{width:20px;height:20px}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:30;display:flex;align-items:center;justify-content:center;padding:10px}
+.lb img{max-width:100%;max-height:100%}
+svg text{fill:var(--mut);font-size:11px}
+svg text.val{fill:var(--txt);font-weight:600}
+.prog{font-size:13px;color:var(--mut);margin-bottom:6px}
+@media(max-width:520px){.hm{display:none}}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<header>
+  <h1>📟 Zählerstände</h1>
+  <button class="btn sm" id="btnMeters">Zähler</button>
+  <button class="btn sm" id="btnData">Daten</button>
+</header>
+<main id="main"></main>
+<button class="btn pri fab" id="fab">📷 Fotos hinzufügen</button>
+<input type="file" id="file" accept="image/*" multiple hidden>
+<input type="file" id="imp" accept="application/json,.json" hidden>
+<div id="layer"></div>
+
 <script>
-// ── Storage ──────────────────────────────────────────────────────────
-const SKEY = "zaehler_v4";
-function loadState(){try{const r=localStorage.getItem(SKEY);return r?JSON.parse(r):null;}catch{return null;}}
-function saveState(s){try{localStorage.setItem(SKEY,JSON.stringify(s));}catch{}}
+"use strict";
+/* ---------- Speicher (IndexedDB, Fallback: Arbeitsspeicher) ---------- */
+let db=null; const mem={};
+function openDB(){return new Promise(res=>{
+  try{const r=indexedDB.open('zaehlerstaende',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+    r.onsuccess=()=>{db=r.result;res(true)};
+    r.onerror=()=>res(false);
+  }catch(e){res(false)}
+});}
+function kvGet(k){return new Promise(res=>{
+  if(!db)return res(mem[k]);
+  const q=db.transaction('kv').objectStore('kv').get(k);
+  q.onsuccess=()=>res(q.result);q.onerror=()=>res(undefined);
+});}
+function kvSet(k,v){return new Promise(res=>{
+  if(!db){mem[k]=v;return res();}
+  const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);
+  t.oncomplete=()=>res();t.onerror=()=>res();
+});}
+function kvDel(k){return new Promise(res=>{
+  if(!db){delete mem[k];return res();}
+  const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);
+  t.oncomplete=()=>res();t.onerror=()=>res();
+});}
 
-// ── Helpers ──────────────────────────────────────────────────────────
-const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
-const fmtD=iso=>new Date(iso).toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
-const fmtN=(n,d=2)=>Number(n).toLocaleString("de-DE",{minimumFractionDigits:d,maximumFractionDigits:d});
-const today=()=>new Date().toISOString().slice(0,10);
+/* ---------- Zustand ---------- */
+const COLORS=['var(--c0)','var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)'];
+let meters=[],readings=[],selMeter=null,persistent=true;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const saveMeters=()=>kvSet('meters',meters);
+const saveReadings=()=>kvSet('readings',readings);
+const photoCache={};
+async function getPhoto(id){if(!id)return null;if(photoCache[id])return photoCache[id];const p=await kvGet('p_'+id);if(p)photoCache[id]=p;return p||null;}
 
-const TEMPLATES=[
-  {type:"strom", label:"Strom",      unit:"kWh",icon:"⚡",color:"#f59e0b"},
-  {type:"gas",   label:"Gas",         unit:"m³", icon:"🔥",color:"#ef4444"},
-  {type:"wasser",label:"Wasser",      unit:"m³", icon:"💧",color:"#3b82f6"},
-  {type:"waerme",label:"Wärme",       unit:"MWh",icon:"🌡️",color:"#8b5cf6"},
-  {type:"solar", label:"Solar",       unit:"kWh",icon:"☀️",color:"#eab308"},
-  {type:"oel",   label:"Öl",          unit:"L",  icon:"🛢️",color:"#78716c"},
-  {type:"custom",label:"Eigener Typ", unit:"",   icon:"📟",color:"#6366f1"},
-];
-const ICONS=["⚡","🔥","💧","🌡️","☀️","🛢️","📟","🏠","🔌","♻️","🌿","❄️"];
-const COLORS=["#f59e0b","#ef4444","#3b82f6","#8b5cf6","#eab308","#78716c","#6366f1","#22d3ee","#a3e635","#f472b6","#fb923c","#34d399"];
+/* ---------- Helfer ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=(n,d=1)=>n==null||isNaN(n)?'–':Number(n).toLocaleString('de-DE',{maximumFractionDigits:d});
+const dayNum=s=>{const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)/86400000;};
+const fmtDate=s=>{const [y,m,d]=s.split('-');return `${d}.${m}.${y}`;};
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const isoFromMs=ms=>{const d=new Date(ms);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const parseNum=s=>{const v=parseFloat(String(s).trim().replace(/\s/g,'').replace(',','.'));return isNaN(v)?null:v;};
+const meterById=id=>meters.find(m=>m.id===id);
+const colorOf=m=>COLORS[meters.indexOf(m)%COLORS.length];
 
-// ── State ────────────────────────────────────────────────────────────
-let state = {
-  meters: [
-    {id:uid(),name:"Strom Haus",  type:"strom", unit:"kWh",icon:"⚡",color:"#f59e0b"},
-    {id:uid(),name:"Gas Heizung", type:"gas",   unit:"m³", icon:"🔥",color:"#ef4444"},
-    {id:uid(),name:"Wasser",      type:"wasser",unit:"m³", icon:"💧",color:"#3b82f6"},
-  ],
-  entries:{},   // {meterId:[{id,value,date,note}]}
-  tab:"overview",
-  view:"dashboard",
-  form:{value:"",date:today(),note:""},
-  editId:null,
-  modal:null,   // null | "addMeter" | {type:"delMeter"|"delEntry",payload}
-  warn:"",
-  mForm:{name:"",type:"strom",unit:"kWh",icon:"⚡",color:"#f59e0b"},
-};
-
-const saved = loadState();
-if(saved && saved.meters?.length){
-  state.meters  = saved.meters;
-  state.entries = saved.entries||{};
-}
-
-function persist(){saveState({meters:state.meters,entries:state.entries});}
-
-// ── DOM helpers ──────────────────────────────────────────────────────
-const el=(tag,props={},children=[])=>{
-  const e=document.createElement(tag);
-  Object.entries(props).forEach(([k,v])=>{
-    if(k==="style"&&typeof v==="object")Object.assign(e.style,v);
-    else if(k.startsWith("on"))e.addEventListener(k.slice(2).toLowerCase(),v);
-    else if(k==="className")e.className=v;
-    else e.setAttribute(k,v);
+function series(meterId){
+  const list=readings.filter(r=>r.meterId===meterId).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.created||0)-(b.created||0));
+  return list.map((r,i)=>{
+    const p=i>0?list[i-1]:null;
+    let diff=null,days=null,neg=false;
+    if(p&&!r.reset){diff=r.value-p.value;days=dayNum(r.date)-dayNum(p.date);if(diff<0)neg=true;}
+    return {...r,diff,days,neg,perDay:diff!=null&&days>0?diff/days:null};
   });
-  children.forEach(c=>{
-    if(c==null||c===false)return;
-    if(typeof c==="string"||typeof c==="number")e.appendChild(document.createTextNode(String(c)));
-    else if(c instanceof Node)e.appendChild(c);
-  });
-  return e;
-};
-const txt=s=>document.createTextNode(String(s??''));
-
-// ── Render ───────────────────────────────────────────────────────────
-function render(){
-  const app=document.getElementById("app");
-  app.innerHTML="";
-  app.appendChild(buildApp());
 }
 
-function setTab(t){state.tab=t;state.view="dashboard";state.warn="";render();}
-function setView(v){state.view=v;state.warn="";render();}
-function setState(patch){Object.assign(state,patch);render();}
-
-// ── Computations ─────────────────────────────────────────────────────
-function getEntries(id){
-  return ((state.entries[id]||[]).slice().sort((a,b)=>a.date.localeCompare(b.date)));
-}
-function lastConsumption(ents){
-  if(ents.length<2)return null;
-  return +(ents[ents.length-1].value - ents[ents.length-2].value).toFixed(3);
-}
-function yearConsumption(ents){
-  const ya=new Date(); ya.setFullYear(ya.getFullYear()-1);
-  const ye=ents.filter(e=>new Date(e.date)>=ya);
-  return ye.length>=2?+(ye[ye.length-1].value-ye[0].value).toFixed(3):null;
-}
-function computeForecast(ents){
-  const s=[...ents];
-  if(s.length<2)return null;
-  const now=new Date(),ys=new Date(now.getFullYear(),0,1),ye=new Date(now.getFullYear(),11,31);
-  const ty=s.filter(e=>new Date(e.date).getFullYear()===now.getFullYear());
-  if(!ty.length)return null;
-  const base=s.filter(e=>new Date(e.date)<=ys).pop()||s[0],last=ty[ty.length-1];
-  const days=Math.max(1,(new Date(last.date)-new Date(base.date))/86400000);
-  const rate=(last.value-base.value)/days;
-  return{forecast:+(rate*365).toFixed(2),remaining:+(rate*((ye-new Date(last.date))/86400000)).toFixed(2),rate:+rate.toFixed(4)};
-}
-
-// ── Styles ───────────────────────────────────────────────────────────
-const S={
-  app:{minHeight:"100vh",background:"#06090f",paddingBottom:"80px"},
-  hdr:{background:"linear-gradient(160deg,#170d38 0%,#0a1020 60%,#06090f 100%)",borderBottom:"1px solid #131d2e",padding:"16px 14px 0"},
-  htit:{fontSize:"18px",fontWeight:"900",letterSpacing:"-0.5px",color:"#f0f6ff",marginBottom:"12px",display:"flex",alignItems:"center",justifyContent:"space-between"},
-  tabs:{display:"flex",gap:"1px",overflowX:"auto",paddingBottom:"0",alignItems:"flex-end",scrollbarWidth:"none"},
-  tab:(a,c)=>({padding:"8px 12px",borderRadius:"8px 8px 0 0",border:"none",fontSize:"11px",fontWeight:a?"700":"500",whiteSpace:"nowrap",background:a?"#0d1726":"transparent",color:a?c:"#475569",borderBottom:a?`2px solid ${c}`:"2px solid transparent",transition:"all .2s"}),
-  body:{padding:"14px 12px",maxWidth:"620px",margin:"0 auto"},
-  card:{background:"#0d1726",borderRadius:"14px",padding:"15px 17px",marginBottom:"11px",border:"1px solid #131d2e"},
-  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"9px",marginBottom:"11px"},
-  stat:c=>({background:"#06090f",borderRadius:"12px",padding:"13px",border:`1px solid ${c}1a`}),
-  slbl:{fontSize:"10px",color:"#475569",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"},
-  sval:c=>({fontSize:"20px",fontWeight:"900",color:c,lineHeight:"1.1"}),
-  sunit:{fontSize:"10px",color:"#475569",marginTop:"3px"},
-  sec:{fontSize:"10px",color:"#374151",textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:"10px",fontWeight:"800"},
-  inp:{width:"100%",background:"#06090f",border:"1px solid #1e293b",borderRadius:"10px",padding:"12px 13px",color:"#e2e8f0",fontSize:"16px",outline:"none",marginBottom:"9px",display:"block"},
-  sel:{width:"100%",background:"#06090f",border:"1px solid #1e293b",borderRadius:"10px",padding:"10px 13px",color:"#e2e8f0",fontSize:"14px",outline:"none",marginBottom:"9px",display:"block"},
-  btn:(c,o)=>({padding:"11px 18px",borderRadius:"10px",border:o?`1px solid ${c}`:"none",background:o?"transparent":c,color:o?c:"#fff",fontWeight:"700",fontSize:"13px"}),
-  warn:{background:"#7c200011",border:"1px solid #f59e0b55",borderRadius:"8px",padding:"9px 13px",color:"#fbbf24",fontSize:"12px",marginBottom:"9px"},
-  nav:{position:"fixed",bottom:"0",left:"0",right:"0",background:"#0d1726",borderTop:"1px solid #131d2e",display:"flex",zIndex:"99"},
-  nbtn:a=>({flex:"1",padding:"10px 4px",border:"none",background:a?"#131d2e":"transparent",color:a?"#e2e8f0":"#374151",fontWeight:a?"700":"500",fontSize:"10px",display:"flex",flexDirection:"column",alignItems:"center",gap:"2px"}),
-  hrow:{display:"flex",alignItems:"flex-start",justifyContent:"space-between",padding:"11px 0",borderBottom:"1px solid #0d1726"},
-  bdg:c=>({background:`${c}18`,color:c,padding:"2px 8px",borderRadius:"20px",fontSize:"11px",fontWeight:"700",display:"inline-block",marginTop:"5px"}),
-  empty:{textAlign:"center",padding:"50px 20px",color:"#1e293b"},
-  modal:{position:"fixed",inset:"0",background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:"200",padding:"16px"},
-  mbox:{background:"#0d1726",border:"1px solid #1e293b",borderRadius:"16px",padding:"20px",maxWidth:"360px",width:"100%",maxHeight:"88vh",overflowY:"auto"},
-  irow:{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"9px"},
-  fab:c=>({position:"fixed",bottom:"82px",right:"16px",width:"52px",height:"52px",borderRadius:"50%",background:c,border:"none",color:"#fff",fontSize:"28px",boxShadow:`0 4px 22px ${c}55`,display:"flex",alignItems:"center",justifyContent:"center",zIndex:"100"}),
-};
-
-// ── Main builder ─────────────────────────────────────────────────────
-function buildApp(){
-  const {tab,view,meters,entries,modal,warn,form,editId,mForm}=state;
-  const isOver=tab==="overview", isSett=tab==="settings";
-  const meter=meters.find(m=>m.id===tab);
-  const mEnts=meter?getEntries(tab):[];
-  const lastE=mEnts[mEnts.length-1],prevE=mEnts[mEnts.length-2];
-  const lastC=lastE&&prevE?+(lastE.value-prevE.value).toFixed(3):null;
-  const yc=meter?yearConsumption(mEnts):null;
-  const avgMon=yc!=null?+(yc/12).toFixed(3):null;
-  const fc=meter?computeForecast(mEnts):null;
-
-  const wrap=el("div",{style:S.app});
-
-  // ── Modals ──
-  if(modal==="addMeter"){
-    const overlay=el("div",{style:S.modal,onclick:e=>{if(e.target===overlay){state.modal=null;render();}}});
-    const box=el("div",{style:S.mbox});
-    box.appendChild(el("div",{style:{fontSize:"15px",fontWeight:"800",marginBottom:"14px",color:"#f0f6ff"}},["Neuen Zähler anlegen"]));
-
-    box.appendChild(el("div",{style:S.slbl},["Typ wählen"]));
-    const selTyp=el("select",{style:S.sel,onchange:e=>{
-      const t=TEMPLATES.find(x=>x.type===e.target.value)||TEMPLATES[0];
-      state.mForm={...state.mForm,type:t.type,unit:t.unit,icon:t.icon,color:t.color};render();
-    }});
-    TEMPLATES.forEach(t=>{
-      const o=el("option",{value:t.type},[`${t.icon} ${t.label}`]);
-      if(t.type===mForm.type)o.selected=true;
-      selTyp.appendChild(o);
-    });
-    box.appendChild(selTyp);
-
-    box.appendChild(el("div",{style:S.slbl},["Name des Zählers"]));
-    const nameInp=el("input",{style:S.inp,type:"text",placeholder:"z.B. Strom Keller",value:mForm.name,
-      oninput:e=>{state.mForm.name=e.target.value;}});
-    box.appendChild(nameInp);
-
-    box.appendChild(el("div",{style:S.slbl},["Einheit"]));
-    const unitInp=el("input",{style:S.inp,type:"text",placeholder:"kWh, m³, L …",value:mForm.unit,
-      oninput:e=>{state.mForm.unit=e.target.value;}});
-    box.appendChild(unitInp);
-
-    box.appendChild(el("div",{style:S.slbl},["Symbol"]));
-    const iconRow=el("div",{style:S.irow});
-    ICONS.forEach(ic=>{
-      const b=el("button",{
-        style:{padding:"6px 10px",borderRadius:"8px",border:`1px solid ${mForm.icon===ic?mForm.color:"#1e293b"}`,background:mForm.icon===ic?`${mForm.color}22`:"transparent",fontSize:"16px"},
-        onclick:()=>{state.mForm.icon=ic;render();}
-      },[ic]);
-      iconRow.appendChild(b);
-    });
-    box.appendChild(iconRow);
-
-    box.appendChild(el("div",{style:S.slbl},["Farbe"]));
-    const colorRow=el("div",{style:{...S.irow,marginBottom:"14px"}});
-    COLORS.forEach(c=>{
-      const d=el("div",{
-        style:{width:"26px",height:"26px",borderRadius:"50%",background:c,border:mForm.color===c?"3px solid #fff":"2px solid transparent",cursor:"pointer",flexShrink:"0"},
-        onclick:()=>{state.mForm.color=c;render();}
-      });
-      colorRow.appendChild(d);
-    });
-    box.appendChild(colorRow);
-
-    const btnRow=el("div",{style:{display:"flex",gap:"9px"}});
-    btnRow.appendChild(el("button",{style:S.btn("#1e293b"),onclick:()=>{state.modal=null;render();}},["Abbrechen"]));
-    const addBtn=el("button",{style:{...S.btn(mForm.color),flex:"1"},onclick:()=>{
-      if(!state.mForm.name.trim())return;
-      const m={id:uid(),name:state.mForm.name.trim(),type:state.mForm.type,unit:state.mForm.unit,icon:state.mForm.icon,color:state.mForm.color};
-      state.meters=[...state.meters,m]; state.modal=null; state.tab=m.id; state.view="dashboard"; persist(); render();
-    }},[`${mForm.icon} Zähler anlegen`]);
-    btnRow.appendChild(addBtn);
-    box.appendChild(btnRow);
-    overlay.appendChild(box);
-    wrap.appendChild(overlay);
-  }
-
-  if(modal?.type==="delMeter"){
-    const m=modal.payload;
-    const cnt=(entries[m.id]||[]).length;
-    const overlay=el("div",{style:S.modal});
-    const box=el("div",{style:S.mbox});
-    box.appendChild(el("div",{style:{fontWeight:"800",fontSize:"15px",marginBottom:"7px"}},["Zähler löschen?"]));
-    box.appendChild(el("div",{style:{color:"#64748b",fontSize:"13px",marginBottom:"6px"}},[`${m.icon} ${m.name}`]));
-    box.appendChild(el("div",{style:{color:"#ef4444",fontSize:"12px",marginBottom:"18px"}},[`⚠️ Alle ${cnt} Ablesungen werden unwiderruflich gelöscht.`]));
-    const btnRow=el("div",{style:{display:"flex",gap:"9px"}});
-    btnRow.appendChild(el("button",{style:{...S.btn("#1e293b"),flex:"1"},onclick:()=>{state.modal=null;render();}},["Abbrechen"]));
-    btnRow.appendChild(el("button",{style:{...S.btn("#dc2626"),flex:"1"},onclick:()=>{
-      state.meters=state.meters.filter(x=>x.id!==m.id);
-      const ne={...state.entries}; delete ne[m.id]; state.entries=ne;
-      state.modal=null; state.tab="overview"; persist(); render();
-    }},["Löschen"]));
-    box.appendChild(btnRow);
-    overlay.appendChild(box); wrap.appendChild(overlay);
-  }
-
-  if(modal?.type==="delEntry"){
-    const e=modal.payload;
-    const overlay=el("div",{style:S.modal});
-    const box=el("div",{style:S.mbox});
-    box.appendChild(el("div",{style:{fontWeight:"800",fontSize:"15px",marginBottom:"7px"}},["Ablesung löschen?"]));
-    box.appendChild(el("div",{style:{color:"#64748b",fontSize:"12px",marginBottom:"18px"}},[`${fmtN(e.value)} ${meter?.unit} · ${fmtD(e.date)}`]));
-    const btnRow=el("div",{style:{display:"flex",gap:"9px"}});
-    btnRow.appendChild(el("button",{style:{...S.btn("#1e293b"),flex:"1"},onclick:()=>{state.modal=null;render();}},["Abbrechen"]));
-    btnRow.appendChild(el("button",{style:{...S.btn("#dc2626"),flex:"1"},onclick:()=>{
-      state.entries={...state.entries,[tab]:(state.entries[tab]||[]).filter(x=>x.id!==e.id)};
-      state.modal=null; persist(); render();
-    }},["Löschen"]));
-    box.appendChild(btnRow);
-    overlay.appendChild(box); wrap.appendChild(overlay);
-  }
-
-  // ── Header ──
-  const hdr=el("div",{style:S.hdr});
-  const htit=el("div",{style:S.htit});
-  htit.appendChild(el("span",{},["🏠 Zählerstände"]));
-  htit.appendChild(el("button",{style:{background:"none",border:"none",color:"#475569",fontSize:"20px",padding:"2px"},onclick:()=>setTab("settings")},["⚙️"]));
-  hdr.appendChild(htit);
-
-  const tabBar=el("div",{style:S.tabs,className:"tabs"});
-  const allBtn=el("button",{style:S.tab(isOver,"#22d3ee"),onclick:()=>setTab("overview")},["🏠 Alle"]);
-  tabBar.appendChild(allBtn);
-  meters.forEach(m=>{
-    const name=m.name.length>10?m.name.slice(0,10)+"…":m.name;
-    tabBar.appendChild(el("button",{style:S.tab(tab===m.id,m.color),onclick:()=>setTab(m.id)},[`${m.icon} ${name}`]));
-  });
-  tabBar.appendChild(el("button",{style:{padding:"8px 10px",borderRadius:"8px 8px 0 0",border:"none",fontSize:"18px",background:"transparent",color:"#374151"},
-    onclick:()=>{state.mForm={name:"",type:"strom",unit:"kWh",icon:"⚡",color:"#f59e0b"};state.modal="addMeter";render();}},["＋"]));
-  hdr.appendChild(tabBar);
-  wrap.appendChild(hdr);
-
-  // ── Body ──
-  const body=el("div",{style:S.body});
-
-  if(isOver){
-    body.appendChild(el("div",{style:{...S.sec,marginTop:"12px"}},["Alle Zähler im Überblick"]));
-    if(meters.length===0){
-      const emp=el("div",{style:S.empty});
-      emp.appendChild(el("div",{style:{fontSize:"44px",marginBottom:"10px"}},["📟"]));
-      emp.appendChild(el("div",{style:{fontSize:"14px",fontWeight:"700",color:"#334155"}},["Noch keine Zähler angelegt"]));
-      emp.appendChild(el("div",{style:{fontSize:"11px",marginTop:"5px",color:"#334155",marginBottom:"20px"}},["Lege deinen ersten Zähler an"]));
-      emp.appendChild(el("button",{style:S.btn("#6366f1"),onclick:()=>{state.mForm={name:"",type:"strom",unit:"kWh",icon:"⚡",color:"#f59e0b"};state.modal="addMeter";render();}},["+ Ersten Zähler anlegen"]));
-      body.appendChild(emp);
-    }
-    meters.forEach(m=>{
-      const ents=getEntries(m.id);
-      const last2=ents[ents.length-1],p2=ents[ents.length-2];
-      const cons=last2&&p2?+(last2.value-p2.value).toFixed(3):null;
-      const yc2=yearConsumption(ents);
-      const card=el("div",{style:{...S.card,cursor:"pointer",borderLeft:`3px solid ${m.color}`},onclick:()=>setTab(m.id)});
-      const top=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between"}});
-      const left=el("div",{style:{display:"flex",alignItems:"center",gap:"10px"}});
-      left.appendChild(el("div",{style:{width:"36px",height:"36px",borderRadius:"10px",background:`${m.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px"}},[m.icon]));
-      const info=el("div");
-      info.appendChild(el("div",{style:{fontWeight:"800",fontSize:"13px",color:"#e2e8f0"}},[m.name]));
-      info.appendChild(el("div",{style:{fontSize:"10px",color:"#374151"}},[`${m.unit} · ${ents.length} Ablesungen`]));
-      left.appendChild(info); top.appendChild(left);
-      const right=el("div",{style:{textAlign:"right"}});
-      right.appendChild(el("div",{style:{fontSize:"16px",fontWeight:"900",color:m.color}},[last2?fmtN(last2.value):"—"]));
-      right.appendChild(el("div",{style:{fontSize:"10px",color:"#374151"}},[last2?fmtD(last2.date):"kein Eintrag"]));
-      top.appendChild(right); card.appendChild(top);
-      if(cons!==null||yc2!==null){
-        const badges=el("div",{style:{display:"flex",gap:"7px",marginTop:"9px",flexWrap:"wrap"}});
-        if(cons!==null)badges.appendChild(el("span",{style:S.bdg(m.color)},[`Δ ${fmtN(cons)} ${m.unit}`]));
-        if(yc2!==null)badges.appendChild(el("span",{style:{...S.bdg(m.color),background:"transparent",border:`1px solid ${m.color}33`}},[`Jahr ${fmtN(yc2)} ${m.unit}`]));
-        card.appendChild(badges);
-      }
-      body.appendChild(card);
-    });
-    if(meters.length>0){
-      body.appendChild(el("button",{style:{...S.btn("#1e293b"),width:"100%",marginTop:"4px",border:"1px solid #1e293b",fontSize:"13px"},
-        onclick:()=>{state.mForm={name:"",type:"strom",unit:"kWh",icon:"⚡",color:"#f59e0b"};state.modal="addMeter";render();}},["+ Weiteren Zähler hinzufügen"]));
-    }
-  }
-
-  if(isSett){
-    const card=el("div",{style:{...S.card,marginTop:"12px"}});
-    const ch=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}});
-    ch.appendChild(el("div",{style:S.sec},["Meine Zähler"]));
-    ch.appendChild(el("button",{style:{...S.btn("#6366f1"),fontSize:"12px",padding:"7px 14px"},
-      onclick:()=>{state.mForm={name:"",type:"strom",unit:"kWh",icon:"⚡",color:"#f59e0b"};state.modal="addMeter";render();}},["+ Hinzufügen"]));
-    card.appendChild(ch);
-    if(!meters.length)card.appendChild(el("div",{style:{color:"#374151",fontSize:"13px",textAlign:"center",padding:"20px 0"}},["Noch keine Zähler"]));
-    meters.forEach(m=>{
-      const row=el("div",{style:{display:"flex",alignItems:"center",gap:"12px",padding:"12px 0",borderBottom:"1px solid #0d1726"}});
-      row.appendChild(el("div",{style:{width:"38px",height:"38px",borderRadius:"10px",background:`${m.color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px",flexShrink:"0"}},[m.icon]));
-      const info=el("div",{style:{flex:"1",minWidth:"0"}});
-      info.appendChild(el("div",{style:{fontWeight:"700",fontSize:"13px",color:"#e2e8f0"}},[m.name]));
-      info.appendChild(el("div",{style:{fontSize:"11px",color:"#374151"}},[`${m.unit} · ${(state.entries[m.id]||[]).length} Ablesungen`]));
-      row.appendChild(info);
-      row.appendChild(el("button",{style:{...S.btn("#1e293b"),fontSize:"11px",padding:"5px 10px"},onclick:()=>setTab(m.id)},["Öffnen"]));
-      row.appendChild(el("button",{style:{background:"none",border:"none",color:"#ef444455",fontSize:"17px",padding:"4px"},onclick:()=>{state.modal={type:"delMeter",payload:m};render();}},["🗑"]));
-      card.appendChild(row);
-    });
-    body.appendChild(card);
-    const card2=el("div",{style:S.card});
-    card2.appendChild(el("button",{style:{...S.btn("#6366f1"),width:"100%",fontSize:"14px",padding:"13px"},
-      onclick:()=>{state.mForm={name:"",type:"strom",unit:"kWh",icon:"⚡",color:"#f59e0b"};state.modal="addMeter";render();}},["+ Neuen Zähler anlegen"]));
-    body.appendChild(card2);
-  }
-
-  if(!isOver&&!isSett&&meter){
-    if(view==="dashboard"){
-      // Header row
-      const hr=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:"12px",marginBottom:"4px"}});
-      const hl=el("div",{style:{display:"flex",alignItems:"center",gap:"8px"}});
-      hl.appendChild(el("span",{style:{fontSize:"22px"}},[meter.icon]));
-      hl.appendChild(el("span",{style:{fontWeight:"800",fontSize:"15px",color:"#e2e8f0"}},[meter.name]));
-      hl.appendChild(el("span",{style:{fontSize:"11px",color:"#374151"}},[meter.unit]));
-      hr.appendChild(hl);
-      hr.appendChild(el("button",{style:{background:"none",border:"none",color:"#374151",fontSize:"13px",padding:"4px 8px"},
-        onclick:()=>{state.modal={type:"delMeter",payload:meter};render();}},["🗑 Löschen"]));
-      body.appendChild(hr);
-
-      // Stats grid
-      const g=el("div",{style:S.g2});
-      const mkStat=(label,val,unit,color)=>{
-        const s=el("div",{style:S.stat(color)});
-        s.appendChild(el("div",{style:S.slbl},[label]));
-        s.appendChild(el("div",{style:S.sval(color)},[val]));
-        s.appendChild(el("div",{style:S.sunit},[unit]));
-        return s;
-      };
-      const lastE2=mEnts[mEnts.length-1];
-      g.appendChild(mkStat("Letzter Stand", lastE2?fmtN(lastE2.value):"—", `${meter.unit} · ${lastE2?fmtD(lastE2.date):"—"}`, meter.color));
-      g.appendChild(mkStat("Letzter Verbrauch", lastC!=null?fmtN(lastC):"—", meter.unit, lastC!=null&&lastC<0?"#ef4444":meter.color));
-      g.appendChild(mkStat("Ø pro Monat", avgMon!=null?fmtN(avgMon):"—", `${meter.unit} (letztes Jahr)`, meter.color));
-      g.appendChild(mkStat("Jahresverbrauch", yc!=null?fmtN(yc):"—", `${meter.unit} (letzte 365 Tage)`, meter.color));
-      body.appendChild(g);
-
-      // Forecast
-      if(fc){
-        const fc_card=el("div",{style:{...S.card,borderColor:`${meter.color}33`,background:`linear-gradient(135deg,${meter.color}0a 0%,#0d1726 100%)`}});
-        fc_card.appendChild(el("div",{style:S.sec},[`📈 Jahresprognose ${new Date().getFullYear()}`]));
-        const fcrow=el("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center"}});
-        const fcl=el("div");
-        fcl.appendChild(el("div",{style:{fontSize:"24px",fontWeight:"900",color:meter.color}},[`${fmtN(fc.forecast)} ${meter.unit}`]));
-        fcl.appendChild(el("div",{style:{fontSize:"10px",color:"#475569",marginTop:"3px"}},[`Hochrechnung · ${fmtN(fc.rate,3)} ${meter.unit}/Tag`]));
-        const fcr=el("div",{style:{textAlign:"right"}});
-        fcr.appendChild(el("div",{style:{fontSize:"11px",color:"#374151"}},["erwartet noch"]));
-        fcr.appendChild(el("div",{style:{fontSize:"17px",fontWeight:"800",color:"#64748b"}},[fmtN(fc.remaining)]));
-        fcr.appendChild(el("div",{style:{fontSize:"10px",color:"#374151"}},[meter.unit]));
-        fcrow.appendChild(fcl); fcrow.appendChild(fcr); fc_card.appendChild(fcrow);
-        body.appendChild(fc_card);
-      }
-
-      // History mini table (last 5)
-      if(mEnts.length>0){
-        const tcard=el("div",{style:S.card});
-        tcard.appendChild(el("div",{style:S.sec},["Letzte Ablesungen"]));
-        const last5=[...mEnts].reverse().slice(0,5);
-        last5.forEach((e,i,arr)=>{
-          const prev=arr[i+1]||mEnts[mEnts.length-2-i]; // approximate
-          const diff=i<arr.length-1?+(e.value-arr[i+1].value).toFixed(3):null;
-          const row=el("div",{style:{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:i<last5.length-1?"1px solid #0d1726":"none",alignItems:"center"}});
-          const left2=el("div");
-          left2.appendChild(el("div",{style:{fontWeight:"700",fontSize:"13px",color:"#e2e8f0"}},[`${fmtN(e.value)} ${meter.unit}`]));
-          left2.appendChild(el("div",{style:{fontSize:"11px",color:"#374151"}},[fmtD(e.date)+(e.note?` · ${e.note}`:"")]));
-          row.appendChild(left2);
-          if(diff!==null){
-            row.appendChild(el("span",{style:S.bdg(diff<0?"#ef4444":meter.color)},[`${diff>=0?"+":""}${fmtN(diff)}`]));
-          }
-          tcard.appendChild(row);
-        });
-        body.appendChild(tcard);
-
-        const btnRow=el("div",{style:{textAlign:"center",marginTop:"4px"}});
-        btnRow.appendChild(el("button",{style:{...S.btn("#0d1726"),fontSize:"11px",padding:"7px 16px",border:"1px solid #1e293b"},
-          onclick:()=>exportCSV(mEnts,meter)},["⬇ CSV exportieren"]));
-        body.appendChild(btnRow);
-      }
-
-      if(mEnts.length===0){
-        const emp=el("div",{style:S.empty});
-        emp.appendChild(el("div",{style:{fontSize:"44px",marginBottom:"10px"}},[meter.icon]));
-        emp.appendChild(el("div",{style:{fontSize:"14px",fontWeight:"700",color:"#1e293b"}},["Noch keine Einträge"]));
-        emp.appendChild(el("div",{style:{fontSize:"11px",marginTop:"5px",color:"#1e293b"}},["Tippe auf + um die erste Ablesung zu erfassen"]));
-        body.appendChild(emp);
-      }
-    }
-
-    if(view==="add"){
-      const card=el("div",{style:{...S.card,marginTop:"12px"}});
-      card.appendChild(el("div",{style:{fontSize:"14px",fontWeight:"800",marginBottom:"14px",color:"#f0f6ff"}},[`${meter.icon} ${meter.name} · ${editId?"Eintrag bearbeiten":"Neue Ablesung"}`]));
-      if(warn)card.appendChild(el("div",{style:S.warn},[warn]));
-
-      card.appendChild(el("div",{style:S.slbl},[`Zählerstand (${meter.unit})`]));
-      const lastE3=mEnts[mEnts.length-1];
-      const valInp=el("input",{style:S.inp,type:"number",step:"0.001",inputmode:"decimal",
-        placeholder:`z.B. ${lastE3?lastE3.value+50:"12345.678"}`,value:form.value,
-        oninput:e=>{state.form.value=e.target.value;state.warn="";}});
-      card.appendChild(valInp);
-
-      card.appendChild(el("div",{style:S.slbl},["Datum"]));
-      const dateInp=el("input",{style:S.inp,type:"date",value:form.date,
-        onchange:e=>{state.form.date=e.target.value;}});
-      card.appendChild(dateInp);
-
-      card.appendChild(el("div",{style:S.slbl},["Notiz (optional)"]));
-      const noteInp=el("input",{style:S.inp,type:"text",placeholder:"z.B. nach Heizperiode",value:form.note,
-        oninput:e=>{state.form.note=e.target.value;}});
-      card.appendChild(noteInp);
-
-      const btnRow=el("div",{style:{display:"flex",gap:"9px",marginTop:"4px"}});
-      btnRow.appendChild(el("button",{style:S.btn("#1e293b"),onclick:()=>{state.view="dashboard";state.editId=null;state.warn="";render();}},["Abbrechen"]));
-      btnRow.appendChild(el("button",{style:{...S.btn(meter.color),flex:"1"},onclick:()=>{
-        state.form.value=valInp.value;
-        state.form.date=dateInp.value;
-        state.form.note=noteInp.value;
-        const val=parseFloat(state.form.value.replace(",","."));
-        if(isNaN(val)||!state.form.date){state.warn="Bitte einen gültigen Wert und ein Datum eingeben.";render();return;}
-        const lastE4=(state.entries[tab]||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
-        const le=lastE4[lastE4.length-1];
-        if(!state.editId&&le&&val<le.value){state.warn=`⚠️ Wert (${fmtN(val)}) liegt unter letztem Stand (${fmtN(le.value)}). Bitte prüfen.`;render();return;}
-        const entry={value:val,date:state.form.date,note:state.form.note,id:state.editId||uid()};
-        const prev2=state.entries[tab]||[];
-        state.entries={...state.entries,[tab]:state.editId?prev2.map(e=>e.id===state.editId?entry:e):[...prev2,entry]};
-        state.form={value:"",date:today(),note:""}; state.editId=null; state.warn=""; state.view="dashboard";
-        persist(); render();
-      }},[editId?"✏️ Aktualisieren":"✓ Speichern"]));
-      card.appendChild(btnRow);
-      body.appendChild(card);
-
-      if(lastE3&&!editId){
-        const ref=el("div",{style:{...S.card,background:"#06090f"}});
-        ref.appendChild(el("div",{style:S.slbl},["Letzter Eintrag zum Vergleich"]));
-        ref.appendChild(el("div",{style:{color:meter.color,fontWeight:"800",fontSize:"16px"}},[`${fmtN(lastE3.value)} ${meter.unit}`]));
-        ref.appendChild(el("div",{style:{color:"#374151",fontSize:"11px",marginTop:"3px"}},[fmtD(lastE3.date)+(lastE3.note?` · ${lastE3.note}`:"")]));
-        body.appendChild(ref);
-      }
-    }
-
-    if(view==="history"){
-      const card=el("div",{style:{...S.card,marginTop:"12px"}});
-      const ch2=el("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"12px"}});
-      ch2.appendChild(el("div",{style:S.sec},[`${meter.icon} ${meter.name} · Verlauf`]));
-      if(mEnts.length>0)ch2.appendChild(el("button",{style:{...S.btn("#0d1726"),fontSize:"10px",padding:"5px 11px",border:"1px solid #1e293b"},onclick:()=>exportCSV(mEnts,meter)},["⬇ CSV"]));
-      card.appendChild(ch2);
-      if(!mEnts.length)card.appendChild(el("div",{style:{color:"#1e293b",textAlign:"center",padding:"28px 0",fontSize:"13px"}},["Keine Einträge"]));
-      [...mEnts].reverse().forEach((e,i,arr)=>{
-        const prev2=arr[i+1];
-        const diff=prev2?+(e.value-prev2.value).toFixed(3):null;
-        const row=el("div",{style:S.hrow});
-        const left2=el("div",{style:{flex:"1"}});
-        left2.appendChild(el("div",{style:{fontWeight:"700",color:"#e2e8f0",fontSize:"13px"}},[`${fmtN(e.value)} ${meter.unit}`]));
-        left2.appendChild(el("div",{style:{fontSize:"11px",color:"#374151",marginTop:"2px"}},[fmtD(e.date)+(e.note?` · ${e.note}`:"")]));
-        if(diff!==null)left2.appendChild(el("span",{style:S.bdg(diff<0?"#ef4444":meter.color)},[`${diff>=0?"+":""}${fmtN(diff)} ${meter.unit}`]));
-        row.appendChild(left2);
-        const btns=el("div",{style:{display:"flex",gap:"4px",marginLeft:"8px"}});
-        btns.appendChild(el("button",{style:{background:"none",border:"none",color:"#3b82f6",fontSize:"15px",padding:"4px"},onclick:()=>{
-          state.form={value:String(e.value),date:e.date,note:e.note||""}; state.editId=e.id; state.warn=""; state.view="add"; render();
-        }},["✏️"]));
-        btns.appendChild(el("button",{style:{background:"none",border:"none",color:"#ef444466",fontSize:"15px",padding:"4px"},onclick:()=>{state.modal={type:"delEntry",payload:e};render();}},["🗑"]));
-        row.appendChild(btns);
-        card.appendChild(row);
-      });
-      body.appendChild(card);
-    }
-
-    // FAB
-    if(view!=="add"){
-      wrap.appendChild(el("button",{style:S.fab(meter.color),onclick:()=>{
-        state.editId=null; state.form={value:"",date:today(),note:""}; state.warn=""; state.view="add"; render();
-      }},["＋"]));
-    }
-  }
-
-  wrap.appendChild(body);
-
-  // ── Bottom Nav ──
-  const nav=el("div",{style:S.nav});
-  const mkNavBtn=(label,icon,active,onclick)=>{
-    const b=el("button",{style:S.nbtn(active),onclick});
-    b.appendChild(el("span",{style:{fontSize:"15px"}},[icon]));
-    b.appendChild(el("span",{},[label]));
-    return b;
+/* ---------- Bildverarbeitung ---------- */
+function shrink(file,max=1280,q=.8){return new Promise((res,rej)=>{
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+    let w=img.naturalWidth,h=img.naturalHeight;const k=Math.min(1,max/Math.max(w,h));
+    w=Math.round(w*k);h=Math.round(h*k);
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',q));
   };
-  nav.appendChild(mkNavBtn("Alle","🏠",isOver,()=>setTab("overview")));
-  if(!isOver&&!isSett){
-    nav.appendChild(mkNavBtn("Übersicht","📊",view==="dashboard",()=>setView("dashboard")));
-    nav.appendChild(mkNavBtn("Verlauf","📋",view==="history",()=>setView("history")));
+  img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Bild nicht lesbar'));};
+  img.src=url;
+});}
+
+/* ---------- Übersicht ---------- */
+async function render(){
+  const main=$('#main');
+  if(!meters.length){main.innerHTML='<div class="empty">Noch keine Zähler angelegt.</div>';return;}
+  if(!meterById(selMeter))selMeter=meters[0].id;
+  let h='';
+  if(!persistent)h+='<div class="panel warn">⚠️ Speicher im Browser nicht verfügbar – Daten gehen beim Schließen verloren. Bitte regelmäßig unter „Daten“ sichern.</div>';
+  h+='<div class="cards">';
+  for(const m of meters){
+    const s=series(m.id),last=s[s.length-1];
+    h+=`<button class="mc ${m.id===selMeter?'sel':''}" style="--col:${colorOf(m)}" data-m="${m.id}">
+      <div class="n"><span class="dot"></span>${esc(m.name)}</div>
+      <div class="v">${last?fmt(last.value,2)+' <small>'+esc(m.unit)+'</small>':'–'}</div>
+      <div class="s">${last?'Stand '+fmtDate(last.date)+(last.diff!=null?' · +'+fmt(last.diff,2)+' '+esc(m.unit):''):'noch keine Werte'}</div></button>`;
   }
-  nav.appendChild(mkNavBtn("Zähler","⚙️",isSett,()=>setTab("settings")));
-  wrap.appendChild(nav);
-
-  return wrap;
+  h+='</div>';
+  const m=meterById(selMeter),s=series(m.id);
+  h+=`<div class="panel"><h2 style="color:${colorOf(m)}">${esc(m.name)}</h2>`;
+  if(!s.length){h+='<div class="empty">Noch keine Zählerstände. Mit „📷 Fotos hinzufügen“ starten.</div></div>';main.innerHTML=h;bind();return;}
+  const diffs=s.filter(x=>x.diff!=null&&!x.neg);
+  const yr=new Date().getFullYear().toString();
+  const thisYear=diffs.filter(x=>x.date.startsWith(yr)).reduce((a,x)=>a+x.diff,0);
+  const totDays=diffs.reduce((a,x)=>a+x.days,0),totDiff=diffs.reduce((a,x)=>a+x.diff,0);
+  const perMonth=totDays>0?totDiff/totDays*30.4375:null;
+  const last=s[s.length-1];
+  h+=`<div class="stats">
+    <div class="stat"><b>${fmt(last.value,2)} ${esc(m.unit)}</b><span>Letzter Stand</span></div>
+    <div class="stat"><b>${last.diff!=null?fmt(last.diff,2)+' '+esc(m.unit):'–'}</b><span>Letzter Verbrauch</span></div>
+    <div class="stat"><b>${fmt(perMonth,1)} ${esc(m.unit)}</b><span>Ø pro Monat</span></div>
+    <div class="stat"><b>${fmt(thisYear,1)} ${esc(m.unit)}</b><span>Verbrauch ${yr}</span></div></div>`;
+  h+=chart(s,m);
+  h+='</div><div class="panel"><h2>Alle Stände</h2><div class="tw"><table><thead><tr><th>Datum</th><th>Stand</th><th>Verbrauch</th><th class="hm">Tage</th><th class="hm">Ø/Tag</th><th>Foto</th></tr></thead><tbody>';
+  const rows=s.slice().reverse();
+  for(const r of rows){
+    h+=`<tr class="row" data-r="${r.id}"><td>${fmtDate(r.date)}${r.reset?' <span class="mut" title="Zählerwechsel">🔄</span>':''}</td>
+      <td>${fmt(r.value,2)}</td>
+      <td class="${r.neg?'warn':''}">${r.diff!=null?(r.neg?'⚠ ':'+')+fmt(r.diff,2):'–'}</td>
+      <td class="mut hm">${r.days!=null?fmt(r.days,0):'–'}</td>
+      <td class="mut hm">${r.perDay!=null?fmt(r.perDay,2):'–'}</td>
+      <td>${r.photoId?`<img class="thumb" data-p="${r.photoId}" alt="">`:''}</td></tr>`;
+  }
+  h+='</tbody></table></div><div class="mut" style="font-size:13px;margin-top:8px">Zeile antippen zum Bearbeiten. ⚠ = Stand niedriger als zuvor (Zählerwechsel? Dann beim Eintrag „Zähler getauscht“ ankreuzen).</div></div>';
+  main.innerHTML=h;bind();
+  document.querySelectorAll('img.thumb').forEach(async im=>{const p=await getPhoto(im.dataset.p);if(p)im.src=p;else im.remove();});
 }
 
-function exportCSV(entries,meter){
-  const rows=[["Datum","Zählerstand","Verbrauch","Notiz"]];
-  entries.forEach((e,i)=>{const p=entries[i-1];rows.push([fmtD(e.date),e.value,p?(e.value-p.value).toFixed(3):"",e.note||""]);});
-  const blob=new Blob(["\uFEFF"+rows.map(r=>r.join(";")).join("\n")],{type:"text/csv;charset=utf-8;"});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`${meter.name}_Zaehlerstaende.csv`;a.click();
+function chart(s,m){
+  const d=s.filter(x=>x.diff!=null&&!x.neg).slice(-12);
+  if(!d.length)return '<div class="mut" style="margin:6px 0">Diagramm erscheint ab dem zweiten Wert.</div>';
+  const W=600,H=220,L=8,R=8,T=22,B=34,n=d.length,bw=(W-L-R)/n,max=Math.max(...d.map(x=>x.diff))||1;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Verbrauch je Zeitraum">`;
+  d.forEach((x,i)=>{
+    const bh=(H-T-B)*(x.diff/max),x0=L+i*bw+bw*.15,w=bw*.7,y=H-B-bh;
+    const [yy,mm]=x.date.split('-');
+    svg+=`<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(bh,1)}" rx="4" fill="${colorOf(m)}"/>
+      <text class="val" x="${x0+w/2}" y="${y-5}" text-anchor="middle">${fmt(x.diff,x.diff>=100?0:1)}</text>
+      <text x="${x0+w/2}" y="${H-B+15}" text-anchor="middle">${mm}/${yy.slice(2)}</text>`;
+  });
+  svg+=`<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--line)"/></svg>`;
+  return `<div class="mut" style="font-size:13px">Verbrauch je Ablesezeitraum (${esc(m.unit)}), letzte ${d.length}</div>`+svg;
 }
 
-render();
+function bind(){
+  document.querySelectorAll('.mc').forEach(b=>b.onclick=()=>{selMeter=b.dataset.m;render();});
+  document.querySelectorAll('tr.row').forEach(tr=>tr.onclick=e=>{
+    if(e.target.classList.contains('thumb')){showPhoto(e.target.src);return;}
+    editReading(tr.dataset.r);
+  });
+}
+function showPhoto(src){
+  if(!src)return;
+  const d=document.createElement('div');d.className='lb';d.innerHTML=`<img src="${src}" alt="">`;
+  d.onclick=()=>d.remove();document.body.appendChild(d);
+}
+
+/* ---------- Eintrag erfassen / bearbeiten ---------- */
+let queue=[],lastMeterUsed=null;
+function layer(html){const l=$('#layer');l.innerHTML=`<div class="modal"><div class="box">${html}</div></div>`;return l.firstChild;}
+function closeLayer(){$('#layer').innerHTML='';}
+
+$('#fab').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+  const files=[...e.target.files];e.target.value='';
+  if(!files.length)return;
+  files.sort((a,b)=>a.lastModified-b.lastModified);
+  queue=files.map(f=>({file:f,total:files.length}));
+  nextInQueue();
+};
+async function nextInQueue(){
+  if(!queue.length){closeLayer();render();return;}
+  const item=queue[0];
+  let dataUrl=null;
+  try{dataUrl=await shrink(item.file);}catch(e){alert('Bild konnte nicht gelesen werden – wird übersprungen.');queue.shift();return nextInQueue();}
+  form({photo:dataUrl,date:isoFromMs(item.file.lastModified),progress:`Foto ${item.total-queue.length+1} von ${item.total}`});
+}
+
+function form(o){
+  const edit=o.edit;
+  const opts=meters.map(m=>`<option value="${m.id}" ${m.id===(o.meterId||lastMeterUsed||selMeter)?'selected':''}>${esc(m.name)} (${esc(m.unit)})</option>`).join('');
+  layer(`<h3>${edit?'Eintrag bearbeiten':'Zählerstand erfassen'}</h3>
+    ${o.progress?`<div class="prog">${o.progress}</div>`:''}
+    ${o.photo?`<img class="photo" id="fp" src="${o.photo}" alt="Zählerfoto">`:''}
+    <label>Zähler</label><select id="fm">${opts}</select>
+    <label>Zählerstand (wie auf dem Foto)</label><input type="text" id="fv" inputmode="decimal" placeholder="z. B. 12345,6" value="${o.value!=null?String(o.value).replace('.',','):''}" autocomplete="off">
+    <label>Datum der Ablesung</label><input type="date" id="fd" value="${o.date||today()}">
+    <label>Notiz (optional)</label><input type="text" id="fn" value="${esc(o.note||'')}">
+    <label class="chk"><input type="checkbox" id="fr" ${o.reset?'checked':''}> Zähler getauscht / neu gestartet (Verbrauch nicht berechnen)</label>
+    <div class="row2">
+      <button class="btn pri" id="fs">${queue.length>1?'Speichern & weiter':'Speichern'}</button>
+      ${edit?'<button class="btn danger" id="fdel">Löschen</button>':(queue.length?'<button class="btn" id="fskip">Überspringen</button>':'')}
+      <button class="btn" id="fc">${queue.length||edit?'Abbrechen':'Schließen'}</button>
+    </div>`);
+  const v=$('#fv');setTimeout(()=>v.focus(),50);
+  if(o.photo)$('#fp').onclick=()=>showPhoto(o.photo);
+  $('#fc').onclick=()=>{queue=[];closeLayer();render();};
+  if($('#fskip'))$('#fskip').onclick=()=>{queue.shift();nextInQueue();};
+  if($('#fdel'))$('#fdel').onclick=async()=>{
+    if(!confirm('Diesen Eintrag löschen?'))return;
+    const r=readings.find(x=>x.id===edit);
+    readings=readings.filter(x=>x.id!==edit);
+    if(r&&r.photoId){await kvDel('p_'+r.photoId);delete photoCache[r.photoId];}
+    await saveReadings();closeLayer();render();
+  };
+  $('#fs').onclick=async()=>{
+    const val=parseNum($('#fv').value);
+    if(val==null){alert('Bitte einen Zählerstand eingeben.');return;}
+    const rec={meterId:$('#fm').value,date:$('#fd').value||today(),value:val,note:$('#fn').value.trim(),reset:$('#fr').checked};
+    lastMeterUsed=rec.meterId;selMeter=rec.meterId;
+    if(edit){
+      const r=readings.find(x=>x.id===edit);Object.assign(r,rec);
+    }else{
+      rec.id=uid();rec.created=Date.now();
+      if(o.photo){rec.photoId=uid();await kvSet('p_'+rec.photoId,o.photo);photoCache[rec.photoId]=o.photo;}
+      readings.push(rec);
+    }
+    await saveReadings();
+    if(!edit&&queue.length){queue.shift();nextInQueue();}
+    else{closeLayer();render();}
+  };
+}
+async function editReading(id){
+  const r=readings.find(x=>x.id===id);if(!r)return;
+  const p=await getPhoto(r.photoId);
+  queue=[];
+  form({edit:id,photo:p,meterId:r.meterId,value:r.value,date:r.date,note:r.note,reset:r.reset});
+}
+
+/* ---------- Zähler verwalten ---------- */
+$('#btnMeters').onclick=meterDialog;
+function meterDialog(){
+  let h='<h3>Zähler</h3>';
+  for(const m of meters){
+    h+=`<div class="row2" style="margin-top:8px;align-items:center"><span class="dot" style="--col:${colorOf(m)}"></span>
+      <span style="flex:3;min-width:120px">${esc(m.name)} <span class="mut">(${esc(m.unit)})</span></span>
+      <button class="btn sm" data-ren="${m.id}" style="flex:0">Ändern</button>
+      <button class="btn sm danger" data-del="${m.id}" style="flex:0">✕</button></div>`;
+  }
+  h+=`<label>Neuer Zähler</label><div class="row2" style="margin-top:0"><input type="text" id="nm" placeholder="Name, z. B. Strom FeWo 1" style="flex:3"><input type="text" id="nu" placeholder="Einheit" value="kWh" style="flex:1;min-width:80px"></div>
+  <div class="row2"><button class="btn pri" id="nadd">Zähler hinzufügen</button><button class="btn" id="nclose">Fertig</button></div>`;
+  layer(h);
+  $('#nclose').onclick=()=>{closeLayer();render();};
+  $('#nadd').onclick=async()=>{
+    const n=$('#nm').value.trim(),u=$('#nu').value.trim()||'kWh';if(!n)return;
+    meters.push({id:uid(),name:n,unit:u});await saveMeters();meterDialog();
+  };
+  document.querySelectorAll('[data-ren]').forEach(b=>b.onclick=async()=>{
+    const m=meterById(b.dataset.ren);
+    const n=prompt('Name',m.name);if(n===null)return;
+    const u=prompt('Einheit',m.unit);if(u===null)return;
+    m.name=n.trim()||m.name;m.unit=u.trim()||m.unit;await saveMeters();meterDialog();
+  });
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    const m=meterById(b.dataset.del);
+    const cnt=readings.filter(r=>r.meterId===m.id).length;
+    if(!confirm(`„${m.name}“ löschen${cnt?` inkl. ${cnt} Einträgen und Fotos`:''}?`))return;
+    for(const r of readings.filter(r=>r.meterId===m.id)){if(r.photoId)await kvDel('p_'+r.photoId);}
+    readings=readings.filter(r=>r.meterId!==m.id);meters=meters.filter(x=>x.id!==m.id);
+    await saveMeters();await saveReadings();meterDialog();
+  });
+}
+
+/* ---------- Daten: Export / Backup ---------- */
+$('#btnData').onclick=()=>{
+  layer(`<h3>Daten</h3><div class="tools" style="flex-direction:column">
+    <button class="btn" id="xcsv">📄 Tabelle als CSV (Excel) exportieren</button>
+    <button class="btn" id="xjson">💾 Komplett-Backup inkl. Fotos (JSON)</button>
+    <button class="btn" id="ijson">📥 Backup einspielen (ersetzt alles)</button>
+    <button class="btn" id="xclose">Schließen</button></div>
+    <div class="mut" style="font-size:13px;margin-top:10px">Alle Daten liegen nur in diesem Browser. Ein Backup ab und zu ist sinnvoll.</div>`);
+  $('#xclose').onclick=closeLayer;
+  $('#xcsv').onclick=exportCSV;
+  $('#xjson').onclick=exportJSON;
+  $('#ijson').onclick=()=>$('#imp').click();
+};
+function download(name,text,type){
+  const b=new Blob([text],{type}),u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{a.remove();URL.revokeObjectURL(u);},2000);
+}
+function exportCSV(){
+  const rows=[['Datum','Zähler','Stand','Einheit','Verbrauch','Tage','Verbrauch pro Tag','Zählerwechsel','Notiz']];
+  const n=x=>x==null?'':String(Math.round(x*1000)/1000).replace('.',',');
+  for(const m of meters)for(const r of series(m.id))
+    rows.push([fmtDate(r.date),m.name,n(r.value),m.unit,n(r.diff),r.days??'',n(r.perDay),r.reset?'ja':'',r.note||'']);
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  download('zaehlerstaende.csv','﻿'+csv,'text/csv;charset=utf-8');
+}
+async function exportJSON(){
+  const photos={};
+  for(const r of readings)if(r.photoId){const p=await getPhoto(r.photoId);if(p)photos[r.photoId]=p;}
+  download(`zaehlerstaende-backup-${today()}.json`,JSON.stringify({v:1,meters,readings,photos}),'application/json');
+}
+$('#imp').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(!Array.isArray(d.meters)||!Array.isArray(d.readings))throw 0;
+    const merge=meters.length&&readings.length&&confirm('OK = zu den vorhandenen Daten HINZUFÜGEN\nAbbrechen = alles durch die Datei ERSETZEN');
+    if(merge){
+      for(const m of d.meters)if(!meters.some(x=>x.id===m.id))meters.push(m);
+      for(const r of d.readings)if(!readings.some(x=>x.id===r.id))readings.push(r);
+    }else{
+      if(!confirm('Alle aktuellen Daten durch die Datei ersetzen?'))return;
+      for(const r of readings)if(r.photoId)await kvDel('p_'+r.photoId);
+      meters=d.meters;readings=d.readings;
+      for(const k in photoCache)delete photoCache[k];
+    }
+    for(const id in (d.photos||{}))await kvSet('p_'+id,d.photos[id]);
+    await saveMeters();await saveReadings();closeLayer();render();
+  }catch(err){alert('Die Datei ist kein gültiges Backup.');}
+};
+
+/* ---------- Start ---------- */
+(async function init(){
+  persistent=await openDB();
+  meters=(await kvGet('meters'))||null;
+  readings=(await kvGet('readings'))||[];
+  if(!meters){
+    meters=[{id:uid(),name:'Strom',unit:'kWh'},{id:uid(),name:'Gas',unit:'m³'},{id:uid(),name:'Wasser',unit:'m³'}];
+    await saveMeters();
+  }
+  selMeter=meters[0].id;
+  render();
+})();
 </script>
 </body>
 </html>
