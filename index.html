@@ -77,6 +77,7 @@ th .mut{font-weight:400;text-transform:none}
 details.det{border-top:1px solid var(--line);padding:8px 0}
 details.det summary{cursor:pointer;font-weight:600;padding:4px 0}
 .mc{cursor:default}
+.ai{font-size:14px;padding:8px 10px;border-radius:10px;background:var(--bg);margin:8px 0}
 .tools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
@@ -306,27 +307,88 @@ function layer(html){const l=$('#layer');l.innerHTML=`<div class="modal"><div cl
 function closeLayer(){$('#layer').innerHTML='';}
 
 $('#fab').onclick=()=>$('#file').click();
+/* ---------- Foto-Import mit automatischer Erkennung ---------- */
+let aiKey='',aiModel='claude-sonnet-5-5',formTok=0;
+async function exifDateTime(file){
+  try{
+    const v=new DataView(await file.slice(0,262144).arrayBuffer());
+    if(v.getUint16(0)!==0xFFD8)return null;
+    let p=2;
+    while(p<v.byteLength-10){
+      const mk=v.getUint16(p),len=v.getUint16(p+2);
+      if(mk===0xFFE1&&v.getUint32(p+4)===0x45786966){
+        const t=p+10,le=v.getUint16(t)===0x4949;
+        const g16=o=>v.getUint16(o,le),g32=o=>v.getUint32(o,le);
+        const rd=off=>{const n=g16(off),r={};for(let i=0;i<n;i++){const e=off+2+i*12;r[g16(e)]={count:g32(e+4),val:e+8};}return r;};
+        const str=en=>{const o=en.count>4?t+g32(en.val):en.val;let x='';for(let k=0;k<en.count-1;k++)x+=String.fromCharCode(v.getUint8(o+k));return x;};
+        const i0=rd(t+g32(t+4));let x=null;
+        if(i0[0x8769]){const ex=rd(t+g32(i0[0x8769].val));if(ex[0x9003])x=str(ex[0x9003]);}
+        if(!x&&i0[0x132])x=str(i0[0x132]);
+        const m=x&&x.match(/^(\d{4}):(\d\d):(\d\d) (\d\d:\d\d:\d\d)/);
+        return m?`${m[1]}-${m[2]}-${m[3]}T${m[4]}`:null;
+      }
+      if((mk&0xFF00)!==0xFF00)break;
+      p+=2+len;
+    }
+  }catch(e){}
+  return null;
+}
 $('#file').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
   if(!files.length)return;
-  files.sort((a,b)=>a.lastModified-b.lastModified);
-  queue=files.map(f=>({file:f,total:files.length}));
+  const items=[];
+  for(const f of files){const dt=await exifDateTime(f);items.push({file:f,dt:dt||isoFromMs(f.lastModified)+'T'+new Date(f.lastModified).toTimeString().slice(0,8)});}
+  items.sort((a,b)=>a.dt<b.dt?-1:a.dt>b.dt?1:0);
+  queue=items.map(x=>({file:x.file,date:x.dt.slice(0,10),total:items.length}));
   nextInQueue();
 };
 async function nextInQueue(){
   if(!queue.length){closeLayer();render();return;}
   const item=queue[0];
+  if(item.synthetic){
+    form({photo:item.photo,date:item.date,meterId:item.meterId,value:item.value,note:item.note,recognized:true,progress:'Weiterer Zähler auf demselben Foto'});
+    return;
+  }
   let dataUrl=null;
-  try{dataUrl=await shrink(item.file);}catch(e){alert('Bild konnte nicht gelesen werden – wird übersprungen.');queue.shift();return nextInQueue();}
-  form({photo:dataUrl,date:isoFromMs(item.file.lastModified),progress:`Foto ${item.total-queue.length+1} von ${item.total}`});
+  try{dataUrl=await shrink(item.file,1400,.82);}catch(e){alert('Bild konnte nicht gelesen werden – wird übersprungen.');queue.shift();return nextInQueue();}
+  const done=item.total-queue.filter(x=>!x.synthetic).length+1;
+  form({photo:dataUrl,date:item.date,progress:`Foto ${done} von ${item.total}`});
+}
+
+async function recognize(dataUrl){
+  const list=meters.map(m=>`- ${m.id}: ${m.name} (Einheit ${m.unit})`).join('\n');
+  const prompt=`Das Foto zeigt einen oder zwei Zähler (Strom, Wärme, Wasser oder Gas). Lies die Zählernummer (Seriennummer) und den aktuellen Zählerstand ab und ordne sie einem dieser bekannten Zähler zu (die Seriennummer steht im Namen):
+${list}
+Regeln: Wert als Zahl mit Punkt als Dezimaltrenner, in der Einheit des Zählers. Wasserzähler: schwarze Ziffern plus rote Ziffern (Nachkommastellen in m³); bei Zählern mit Zeigerrädchen die Zeiger ignorieren und nur das Zahlenwerk lesen. Gaszähler: 5 Stellen vor dem Komma, 3 rote Nachkommastellen. Stromzähler mit rotem Kästchen: die rote letzte Ziffer ist 1/10 kWh. Wärmezähler: nur kWh-Anzeige übernehmen; zeigt das Display eine andere Einheit (z. B. m³), gib value null an. Zeigt das Foto zwei Zähler, gib zwei Einträge zurück. Passt die Seriennummer zu keinem bekannten Zähler, setze meterId null und trage die gelesene Nummer bei serial ein. Ist eine Ziffer nicht sicher lesbar, setze unsure true und erkläre es kurz in note.
+Antworte NUR mit JSON: {"readings":[{"meterId":"m3"|null,"serial":"…","value":123.4|null,"unsure":false,"note":""}]}`;
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':aiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:aiModel,max_tokens:600,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:dataUrl.split(',')[1]}},{type:'text',text:prompt}]}]})});
+  if(!r.ok){let m='';try{m=(await r.json()).error.message;}catch(e){}throw new Error(r.status===401?'API-Schlüssel ungültig':(m||'Fehler '+r.status));}
+  const j=await r.json(),t=(j.content||[]).map(c=>c.text||'').join(''),mm=t.match(/\{[\s\S]*\}/);
+  if(!mm)throw new Error('Antwort nicht lesbar');
+  const d=JSON.parse(mm[0]);return Array.isArray(d.readings)?d.readings:[];
+}
+function lastValue(meterId){
+  const l=series(meterId);return l.length?l[l.length-1]:null;
+}
+function aiDialog(){
+  layer(`<h3>🤖 Automatische Erkennung</h3>
+    <div class="mut" style="font-size:14px;margin-bottom:8px">Beim Foto-Import liest Claude die Zählernummer und den Stand vom Foto ab und füllt das Formular vor. Du prüfst und speicherst. Dafür brauchst du einen API-Schlüssel von console.anthropic.com. Kosten: wenige Cent pro Foto, am besten ein kleines Monatslimit setzen. Das Foto wird zur Erkennung an Anthropic gesendet. Der Schlüssel bleibt nur in diesem Browser.</div>
+    <label>API-Schlüssel</label><input type="password" id="aik" value="${esc(aiKey)}" placeholder="sk-ant-…" autocomplete="off">
+    <label>Modell</label><input type="text" id="aim" value="${esc(aiModel)}">
+    <div class="row2"><button class="btn pri" id="aisave">Speichern</button><button class="btn danger" id="aidel">Entfernen</button><button class="btn" id="aiclose">Schließen</button></div>`);
+  $('#aiclose').onclick=closeLayer;
+  $('#aisave').onclick=async()=>{aiKey=$('#aik').value.trim();aiModel=$('#aim').value.trim()||'claude-sonnet-5-5';await kvSet('aikey',aiKey);await kvSet('aimodel',aiModel);closeLayer();};
+  $('#aidel').onclick=async()=>{aiKey='';await kvDel('aikey');closeLayer();};
 }
 
 function form(o){
-  const edit=o.edit;
+  const edit=o.edit;const tok=++formTok;
   const opts=meters.map(m=>`<option value="${m.id}" ${m.id===(o.meterId||lastMeterUsed||selMeter)?'selected':''}>${esc(m.name)} (${esc(m.unit)})</option>`).join('');
   layer(`<h3>${edit?'Eintrag bearbeiten':'Zählerstand erfassen'}</h3>
     ${o.progress?`<div class="prog">${o.progress}</div>`:''}
     ${o.photo?`<img class="photo" id="fp" src="${o.photo}" alt="Zählerfoto">`:''}
+    ${!edit&&o.photo?`<div class="ai" id="fai">${o.recognized?'🤖 Automatisch erkannt – bitte prüfen.':aiKey?'⏳ Foto wird erkannt …':'💡 Tipp: Unter „Daten“ → „Automatische Erkennung“ einen API-Schlüssel eintragen, dann werden Zählernummer und Stand automatisch erkannt.'}</div>`:''}
     <label>Zähler</label><select id="fm">${opts}</select>
     <label>Zählerstand (wie auf dem Foto)</label><input type="text" id="fv" inputmode="decimal" placeholder="z. B. 12345,6" value="${o.value!=null?String(o.value).replace('.',','):''}" autocomplete="off">
     <label>Datum der Ablesung</label><input type="date" id="fd" value="${o.date||today()}">
@@ -337,6 +399,28 @@ function form(o){
       ${edit?'<button class="btn danger" id="fdel">Löschen</button>':(queue.length?'<button class="btn" id="fskip">Überspringen</button>':'')}
       <button class="btn" id="fc">${queue.length||edit?'Abbrechen':'Schließen'}</button>
     </div>`);
+  if(!edit&&o.photo&&!o.recognized&&aiKey){
+    recognize(o.photo).then(res=>{
+      if(tok!==formTok||!$('#fai'))return;
+      const ai=$('#fai'),list=res.filter(x=>x&&x.value!=null);
+      if(!list.length){ai.textContent='⚠ Es konnte kein Stand erkannt werden'+(res[0]&&res[0].note?' ('+res[0].note+')':'')+' – bitte von Hand eintragen.';return;}
+      const f=list[0],m=f.meterId&&meterById(f.meterId);
+      if(m){$('#fm').value=m.id;}
+      if(!$('#fv').value.trim())$('#fv').value=String(f.value).replace('.',',');
+      if(f.unsure&&!$('#fn').value)$('#fn').value='unsicher: '+(f.note||'Ziffern prüfen');
+      let msg='🤖 Erkannt: '+(m?esc(m.name):'Zählernr. '+esc(f.serial||'?')+' (nicht zugeordnet – bitte Zähler wählen)')+', '+fmt(f.value,3)+(m?' '+esc(m.unit):'');
+      if(f.unsure)msg+=' · ⚠ unsicher, bitte mit dem Foto prüfen';
+      const lv=m&&lastValue(m.id);
+      if(lv&&f.value<lv.value)msg+=' · ⚠ niedriger als der letzte Stand ('+fmt(lv.value,3)+')';
+      const ex=list.slice(1);
+      if(ex.length){
+        queue.splice(1,0,...ex.map(x=>({synthetic:true,photo:o.photo,date:o.date,meterId:x.meterId&&meterById(x.meterId)?x.meterId:null,value:x.value,note:x.unsure?'unsicher: '+(x.note||'Ziffern prüfen'):'',total:0})));
+        msg+=' · '+ex.length+' weiterer Zähler auf dem Foto folgt';
+        $('#fs').textContent='Speichern & weiter';
+      }
+      ai.innerHTML=msg;
+    }).catch(err=>{if(tok!==formTok||!$('#fai'))return;$('#fai').textContent='⚠ Erkennung nicht möglich: '+err.message+' – bitte von Hand eintragen.';});
+  }
   const v=$('#fv');setTimeout(()=>v.focus(),50);
   if(o.photo)$('#fp').onclick=()=>showPhoto(o.photo);
   $('#fc').onclick=()=>{queue=[];closeLayer();render();};
@@ -411,12 +495,14 @@ function meterDialog(){
 /* ---------- Daten: Export / Backup ---------- */
 $('#btnData').onclick=()=>{
   layer(`<h3>Daten</h3><div class="tools" style="flex-direction:column">
+    <button class="btn" id="xai">🤖 Automatische Erkennung (API-Schlüssel)</button>
     <button class="btn" id="xcsv">📄 Tabelle als CSV (Excel) exportieren</button>
     <button class="btn" id="xjson">💾 Komplett-Backup inkl. Fotos (JSON)</button>
     <button class="btn" id="ijson">📥 Backup einspielen (ersetzt alles)</button>
     <button class="btn" id="xclose">Schließen</button></div>
     <div class="mut" style="font-size:13px;margin-top:10px">Alle Daten liegen nur in diesem Browser. Ein Backup ab und zu ist sinnvoll.</div>`);
   $('#xclose').onclick=closeLayer;
+  $('#xai').onclick=aiDialog;
   $('#xcsv').onclick=exportCSV;
   $('#xjson').onclick=exportJSON;
   $('#ijson').onclick=()=>$('#imp').click();
@@ -489,6 +575,7 @@ async function markDeleted(ids){await kvSet('deleted',[...new Set([...(((await k
   persistent=await openDB();
   meters=(await kvGet('meters'))||null;
   readings=(await kvGet('readings'))||[];
+  aiKey=(await kvGet('aikey'))||'';aiModel=(await kvGet('aimodel'))||'claude-sonnet-5-5';
   await syncRemote();
   if(!meters){
     meters=[{id:uid(),name:'Strom',unit:'kWh'},{id:uid(),name:'Gas',unit:'m³'},{id:uid(),name:'Wasser',unit:'m³'}];
