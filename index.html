@@ -68,6 +68,7 @@ svg text.val{fill:var(--txt);font-weight:600}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px;-webkit-overflow-scrolling:touch}
 .chip{border:1px solid var(--line);background:var(--card);color:var(--txt);border-radius:20px;padding:8px 14px;white-space:nowrap;font-size:15px}
 .chip.on{background:var(--acc);color:var(--acc-t);border-color:var(--acc);font-weight:600}
+.chip.sm{padding:6px 12px;font-size:14px}
 .chips.cats .chip{font-size:16px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;margin:4px 0}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
@@ -167,7 +168,7 @@ function shrink(file,max=1280,q=.8){return new Promise((res,rej)=>{
 const CATS=['Strom','Wärme','Wasser','Gas'];
 const catOf=m=>/strom/i.test(m.name)?'Strom':/wärme|waerme/i.test(m.name)?'Wärme':/gas/i.test(m.name)&&!/wasser/i.test(m.name)?'Gas':/wasser/i.test(m.name)?'Wasser':'Sonstige';
 const CATICON={Strom:'⚡',Wärme:'🔥',Wasser:'💧',Gas:'🟦',Sonstige:'📟'};
-let selYear='alle',selCat=null;
+let selYear='alle',selCat=null,selOne=null;
 const MONTHN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const dim=ym=>{const [y,m]=ym.split('-').map(Number);return new Date(Date.UTC(y,m,0)).getUTCDate();};
 
@@ -202,7 +203,9 @@ async function render(){
   if(selYear!=='alle'&&!ys.includes(selYear))selYear='alle';
   const present=[...new Set(meters.map(catOf))].sort((a,b)=>(CATS.indexOf(a)+9)%9-(CATS.indexOf(b)+9)%9);
   if(!selCat||!present.includes(selCat))selCat=present[0];
-  const cm=meters.filter(m=>catOf(m)===selCat);
+  const catMeters=meters.filter(m=>catOf(m)===selCat);
+  if(selOne&&!catMeters.some(m=>m.id===selOne))selOne=null;
+  const cm=selOne?catMeters.filter(m=>m.id===selOne):catMeters;
   const all=monthList();
   let months=selYear==='alle'?all:Array.from({length:12},(_,i)=>`${selYear}-${String(i+1).padStart(2,'0')}`);
   const mon={};cm.forEach(m=>mon[m.id]=monthly(m.id));
@@ -213,6 +216,7 @@ async function render(){
   if(!persistent)h+='<div class="panel warn">⚠️ Speicher im Browser nicht verfügbar – Daten gehen beim Schließen verloren. Bitte regelmäßig unter „Daten“ sichern.</div>';
   h+='<div class="chips">'+['alle',...ys].map(y=>`<button class="chip ${y===selYear?'on':''}" data-y="${y}">${y==='alle'?'Alle Jahre':y}</button>`).join('')+'</div>';
   h+='<div class="chips cats">'+present.map(c=>`<button class="chip ${c===selCat?'on':''}" data-c="${c}">${CATICON[c]||''} ${c}</button>`).join('')+'</div>';
+  if(catMeters.length>1)h+='<div class="chips">'+[`<button class="chip sm ${!selOne?'on':''}" data-m="">Alle ${esc(selCat)}</button>`,...catMeters.map(m=>`<button class="chip sm ${selOne===m.id?'on':''}" data-m="${m.id}" style="${selOne===m.id?'':'border-color:'+colorOf(m)}">${esc(shortN(m))}</button>`)].join('')+'</div>';
   /* Kennzahlen */
   h+='<div class="cards">';
   for(const m of cm){
@@ -283,7 +287,8 @@ function stackChart(cm,mon,months){
 
 function bind(){
   document.querySelectorAll('[data-y]').forEach(b=>b.onclick=()=>{selYear=b.dataset.y;render();});
-  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{selCat=b.dataset.c;render();});
+  document.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{selCat=b.dataset.c;selOne=null;render();});
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{selOne=b.dataset.m||null;render();});
   document.querySelectorAll('tr.row').forEach(tr=>tr.onclick=e=>{
     if(e.target.classList.contains('thumb')){showPhoto(e.target.src);return;}
     editReading(tr.dataset.r);
@@ -347,7 +352,7 @@ function form(o){
     const val=parseNum($('#fv').value);
     if(val==null){alert('Bitte einen Zählerstand eingeben.');return;}
     const rec={meterId:$('#fm').value,date:$('#fd').value||today(),value:val,note:$('#fn').value.trim(),reset:$('#fr').checked};
-    lastMeterUsed=rec.meterId;selMeter=rec.meterId;selCat=catOf(meterById(rec.meterId));
+    lastMeterUsed=rec.meterId;selMeter=rec.meterId;selCat=catOf(meterById(rec.meterId));selOne=null;
     if(edit){
       const r=readings.find(x=>x.id===edit);Object.assign(r,rec);
     }else{
