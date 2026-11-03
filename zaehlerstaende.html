@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zählerstände</title>
+<style>
+:root{
+  --bg:#f5f6f4; --card:#fff; --txt:#1d2421; --mut:#6b7570; --line:#e1e5e2;
+  --acc:#2f6f5e; --acc-t:#fff; --warn:#b45309; --bad:#b42318;
+  --c0:#2f6f5e; --c1:#c2701a; --c2:#2c6fb0; --c3:#8a4fa3; --c4:#b23a48; --c5:#5d7a2a;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#141816;--card:#1e2421;--txt:#e8ece9;--mut:#93a09a;--line:#2f3833;--acc:#5fb59d;--acc-t:#0d1512;--warn:#e0a050;--bad:#f08a80;
+  --c0:#5fb59d;--c1:#e0a050;--c2:#6aa8e0;--c3:#c08ad6;--c4:#e8808c;--c5:#9cbf5a;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{display:flex;align-items:center;gap:10px;padding:14px 16px;padding-top:max(14px,env(safe-area-inset-top));position:sticky;top:0;background:var(--bg);z-index:5;border-bottom:1px solid var(--line)}
+header h1{font-size:20px;margin:0;flex:1}
+main{max-width:860px;margin:0 auto;padding:14px 14px 110px}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--txt);padding:9px 14px;border-radius:10px}
+.btn.pri{background:var(--acc);color:var(--acc-t);border-color:var(--acc);font-weight:600}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:6px 10px;font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:16px}
+.mc{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:12px 14px;text-align:left;color:var(--txt)}
+.mc.sel{border-color:var(--col)}
+.mc .n{display:flex;align-items:center;gap:8px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--col);display:inline-block}
+.mc .v{font-size:22px;font-weight:700;margin-top:6px}
+.mc .s{color:var(--mut);font-size:13px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.panel h2{font-size:17px;margin:0 0 10px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--bg);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font-size:12px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+tr.row{cursor:pointer}
+.tw{overflow-x:auto}
+.thumb{width:38px;height:38px;object-fit:cover;border-radius:6px;vertical-align:middle;border:1px solid var(--line)}
+.warn{color:var(--warn)}
+.mut{color:var(--mut)}
+.empty{text-align:center;color:var(--mut);padding:30px 10px}
+.fab{position:fixed;right:16px;bottom:max(16px,env(safe-area-inset-bottom));z-index:6;border-radius:30px;padding:14px 20px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.modal .box{background:var(--card);width:100%;max-width:560px;max-height:94vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))}
+@media(min-width:600px){.modal{align-items:center}.modal .box{border-radius:18px}}
+.modal h3{margin:0 0 10px;font-size:18px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input[type=text],input[type=date],input[type=number],select,textarea{width:100%;font:inherit;font-size:17px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--txt)}
+.photo{width:100%;max-height:46vh;object-fit:contain;background:#000;border-radius:10px;display:block}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.row2 .btn{flex:1;min-width:110px}
+.chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:15px;color:var(--txt)}
+.chk input{width:20px;height:20px}
+.lb{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:30;display:flex;align-items:center;justify-content:center;padding:10px}
+.lb img{max-width:100%;max-height:100%}
+svg text{fill:var(--mut);font-size:11px}
+svg text.val{fill:var(--txt);font-weight:600}
+.prog{font-size:13px;color:var(--mut);margin-bottom:6px}
+@media(max-width:520px){.hm{display:none}}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+  <h1>📟 Zählerstände</h1>
+  <button class="btn sm" id="btnMeters">Zähler</button>
+  <button class="btn sm" id="btnData">Daten</button>
+</header>
+<main id="main"></main>
+<button class="btn pri fab" id="fab">📷 Fotos hinzufügen</button>
+<input type="file" id="file" accept="image/*" multiple hidden>
+<input type="file" id="imp" accept="application/json,.json" hidden>
+<div id="layer"></div>
+
+<script>
+"use strict";
+/* ---------- Speicher (IndexedDB, Fallback: Arbeitsspeicher) ---------- */
+let db=null; const mem={};
+function openDB(){return new Promise(res=>{
+  try{const r=indexedDB.open('zaehlerstaende',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+    r.onsuccess=()=>{db=r.result;res(true)};
+    r.onerror=()=>res(false);
+  }catch(e){res(false)}
+});}
+function kvGet(k){return new Promise(res=>{
+  if(!db)return res(mem[k]);
+  const q=db.transaction('kv').objectStore('kv').get(k);
+  q.onsuccess=()=>res(q.result);q.onerror=()=>res(undefined);
+});}
+function kvSet(k,v){return new Promise(res=>{
+  if(!db){mem[k]=v;return res();}
+  const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);
+  t.oncomplete=()=>res();t.onerror=()=>res();
+});}
+function kvDel(k){return new Promise(res=>{
+  if(!db){delete mem[k];return res();}
+  const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);
+  t.oncomplete=()=>res();t.onerror=()=>res();
+});}
+
+/* ---------- Zustand ---------- */
+const COLORS=['var(--c0)','var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)'];
+let meters=[],readings=[],selMeter=null,persistent=true;
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const saveMeters=()=>kvSet('meters',meters);
+const saveReadings=()=>kvSet('readings',readings);
+const photoCache={};
+async function getPhoto(id){if(!id)return null;if(photoCache[id])return photoCache[id];const p=await kvGet('p_'+id);if(p)photoCache[id]=p;return p||null;}
+
+/* ---------- Helfer ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=(n,d=1)=>n==null||isNaN(n)?'–':Number(n).toLocaleString('de-DE',{maximumFractionDigits:d});
+const dayNum=s=>{const [y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)/86400000;};
+const fmtDate=s=>{const [y,m,d]=s.split('-');return `${d}.${m}.${y}`;};
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const isoFromMs=ms=>{const d=new Date(ms);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const parseNum=s=>{const v=parseFloat(String(s).trim().replace(/\s/g,'').replace(',','.'));return isNaN(v)?null:v;};
+const meterById=id=>meters.find(m=>m.id===id);
+const colorOf=m=>COLORS[meters.indexOf(m)%COLORS.length];
+
+function series(meterId){
+  const list=readings.filter(r=>r.meterId===meterId).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.created||0)-(b.created||0));
+  return list.map((r,i)=>{
+    const p=i>0?list[i-1]:null;
+    let diff=null,days=null,neg=false;
+    if(p&&!r.reset){diff=r.value-p.value;days=dayNum(r.date)-dayNum(p.date);if(diff<0)neg=true;}
+    return {...r,diff,days,neg,perDay:diff!=null&&days>0?diff/days:null};
+  });
+}
+
+/* ---------- Bildverarbeitung ---------- */
+function shrink(file,max=1280,q=.8){return new Promise((res,rej)=>{
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+    let w=img.naturalWidth,h=img.naturalHeight;const k=Math.min(1,max/Math.max(w,h));
+    w=Math.round(w*k);h=Math.round(h*k);
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',q));
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('Bild nicht lesbar'));};
+  img.src=url;
+});}
+
+/* ---------- Übersicht ---------- */
+async function render(){
+  const main=$('#main');
+  if(!meters.length){main.innerHTML='<div class="empty">Noch keine Zähler angelegt.</div>';return;}
+  if(!meterById(selMeter))selMeter=meters[0].id;
+  let h='';
+  if(!persistent)h+='<div class="panel warn">⚠️ Speicher im Browser nicht verfügbar – Daten gehen beim Schließen verloren. Bitte regelmäßig unter „Daten“ sichern.</div>';
+  h+='<div class="cards">';
+  for(const m of meters){
+    const s=series(m.id),last=s[s.length-1];
+    h+=`<button class="mc ${m.id===selMeter?'sel':''}" style="--col:${colorOf(m)}" data-m="${m.id}">
+      <div class="n"><span class="dot"></span>${esc(m.name)}</div>
+      <div class="v">${last?fmt(last.value,2)+' <small>'+esc(m.unit)+'</small>':'–'}</div>
+      <div class="s">${last?'Stand '+fmtDate(last.date)+(last.diff!=null?' · +'+fmt(last.diff,2)+' '+esc(m.unit):''):'noch keine Werte'}</div></button>`;
+  }
+  h+='</div>';
+  const m=meterById(selMeter),s=series(m.id);
+  h+=`<div class="panel"><h2 style="color:${colorOf(m)}">${esc(m.name)}</h2>`;
+  if(!s.length){h+='<div class="empty">Noch keine Zählerstände. Mit „📷 Fotos hinzufügen“ starten.</div></div>';main.innerHTML=h;bind();return;}
+  const diffs=s.filter(x=>x.diff!=null&&!x.neg);
+  const yr=new Date().getFullYear().toString();
+  const thisYear=diffs.filter(x=>x.date.startsWith(yr)).reduce((a,x)=>a+x.diff,0);
+  const totDays=diffs.reduce((a,x)=>a+x.days,0),totDiff=diffs.reduce((a,x)=>a+x.diff,0);
+  const perMonth=totDays>0?totDiff/totDays*30.4375:null;
+  const last=s[s.length-1];
+  h+=`<div class="stats">
+    <div class="stat"><b>${fmt(last.value,2)} ${esc(m.unit)}</b><span>Letzter Stand</span></div>
+    <div class="stat"><b>${last.diff!=null?fmt(last.diff,2)+' '+esc(m.unit):'–'}</b><span>Letzter Verbrauch</span></div>
+    <div class="stat"><b>${fmt(perMonth,1)} ${esc(m.unit)}</b><span>Ø pro Monat</span></div>
+    <div class="stat"><b>${fmt(thisYear,1)} ${esc(m.unit)}</b><span>Verbrauch ${yr}</span></div></div>`;
+  h+=chart(s,m);
+  h+='</div><div class="panel"><h2>Alle Stände</h2><div class="tw"><table><thead><tr><th>Datum</th><th>Stand</th><th>Verbrauch</th><th class="hm">Tage</th><th class="hm">Ø/Tag</th><th>Foto</th></tr></thead><tbody>';
+  const rows=s.slice().reverse();
+  for(const r of rows){
+    h+=`<tr class="row" data-r="${r.id}"><td>${fmtDate(r.date)}${r.reset?' <span class="mut" title="Zählerwechsel">🔄</span>':''}</td>
+      <td>${fmt(r.value,2)}</td>
+      <td class="${r.neg?'warn':''}">${r.diff!=null?(r.neg?'⚠ ':'+')+fmt(r.diff,2):'–'}</td>
+      <td class="mut hm">${r.days!=null?fmt(r.days,0):'–'}</td>
+      <td class="mut hm">${r.perDay!=null?fmt(r.perDay,2):'–'}</td>
+      <td>${r.photoId?`<img class="thumb" data-p="${r.photoId}" alt="">`:''}</td></tr>`;
+  }
+  h+='</tbody></table></div><div class="mut" style="font-size:13px;margin-top:8px">Zeile antippen zum Bearbeiten. ⚠ = Stand niedriger als zuvor (Zählerwechsel? Dann beim Eintrag „Zähler getauscht“ ankreuzen).</div></div>';
+  main.innerHTML=h;bind();
+  document.querySelectorAll('img.thumb').forEach(async im=>{const p=await getPhoto(im.dataset.p);if(p)im.src=p;else im.remove();});
+}
+
+function chart(s,m){
+  const d=s.filter(x=>x.diff!=null&&!x.neg).slice(-12);
+  if(!d.length)return '<div class="mut" style="margin:6px 0">Diagramm erscheint ab dem zweiten Wert.</div>';
+  const W=600,H=220,L=8,R=8,T=22,B=34,n=d.length,bw=(W-L-R)/n,max=Math.max(...d.map(x=>x.diff))||1;
+  let svg=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Verbrauch je Zeitraum">`;
+  d.forEach((x,i)=>{
+    const bh=(H-T-B)*(x.diff/max),x0=L+i*bw+bw*.15,w=bw*.7,y=H-B-bh;
+    const [yy,mm]=x.date.split('-');
+    svg+=`<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(bh,1)}" rx="4" fill="${colorOf(m)}"/>
+      <text class="val" x="${x0+w/2}" y="${y-5}" text-anchor="middle">${fmt(x.diff,x.diff>=100?0:1)}</text>
+      <text x="${x0+w/2}" y="${H-B+15}" text-anchor="middle">${mm}/${yy.slice(2)}</text>`;
+  });
+  svg+=`<line x1="${L}" x2="${W-R}" y1="${H-B}" y2="${H-B}" stroke="var(--line)"/></svg>`;
+  return `<div class="mut" style="font-size:13px">Verbrauch je Ablesezeitraum (${esc(m.unit)}), letzte ${d.length}</div>`+svg;
+}
+
+function bind(){
+  document.querySelectorAll('.mc').forEach(b=>b.onclick=()=>{selMeter=b.dataset.m;render();});
+  document.querySelectorAll('tr.row').forEach(tr=>tr.onclick=e=>{
+    if(e.target.classList.contains('thumb')){showPhoto(e.target.src);return;}
+    editReading(tr.dataset.r);
+  });
+}
+function showPhoto(src){
+  if(!src)return;
+  const d=document.createElement('div');d.className='lb';d.innerHTML=`<img src="${src}" alt="">`;
+  d.onclick=()=>d.remove();document.body.appendChild(d);
+}
+
+/* ---------- Eintrag erfassen / bearbeiten ---------- */
+let queue=[],lastMeterUsed=null;
+function layer(html){const l=$('#layer');l.innerHTML=`<div class="modal"><div class="box">${html}</div></div>`;return l.firstChild;}
+function closeLayer(){$('#layer').innerHTML='';}
+
+$('#fab').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{
+  const files=[...e.target.files];e.target.value='';
+  if(!files.length)return;
+  files.sort((a,b)=>a.lastModified-b.lastModified);
+  queue=files.map(f=>({file:f,total:files.length}));
+  nextInQueue();
+};
+async function nextInQueue(){
+  if(!queue.length){closeLayer();render();return;}
+  const item=queue[0];
+  let dataUrl=null;
+  try{dataUrl=await shrink(item.file);}catch(e){alert('Bild konnte nicht gelesen werden – wird übersprungen.');queue.shift();return nextInQueue();}
+  form({photo:dataUrl,date:isoFromMs(item.file.lastModified),progress:`Foto ${item.total-queue.length+1} von ${item.total}`});
+}
+
+function form(o){
+  const edit=o.edit;
+  const opts=meters.map(m=>`<option value="${m.id}" ${m.id===(o.meterId||lastMeterUsed||selMeter)?'selected':''}>${esc(m.name)} (${esc(m.unit)})</option>`).join('');
+  layer(`<h3>${edit?'Eintrag bearbeiten':'Zählerstand erfassen'}</h3>
+    ${o.progress?`<div class="prog">${o.progress}</div>`:''}
+    ${o.photo?`<img class="photo" id="fp" src="${o.photo}" alt="Zählerfoto">`:''}
+    <label>Zähler</label><select id="fm">${opts}</select>
+    <label>Zählerstand (wie auf dem Foto)</label><input type="text" id="fv" inputmode="decimal" placeholder="z. B. 12345,6" value="${o.value!=null?String(o.value).replace('.',','):''}" autocomplete="off">
+    <label>Datum der Ablesung</label><input type="date" id="fd" value="${o.date||today()}">
+    <label>Notiz (optional)</label><input type="text" id="fn" value="${esc(o.note||'')}">
+    <label class="chk"><input type="checkbox" id="fr" ${o.reset?'checked':''}> Zähler getauscht / neu gestartet (Verbrauch nicht berechnen)</label>
+    <div class="row2">
+      <button class="btn pri" id="fs">${queue.length>1?'Speichern & weiter':'Speichern'}</button>
+      ${edit?'<button class="btn danger" id="fdel">Löschen</button>':(queue.length?'<button class="btn" id="fskip">Überspringen</button>':'')}
+      <button class="btn" id="fc">${queue.length||edit?'Abbrechen':'Schließen'}</button>
+    </div>`);
+  const v=$('#fv');setTimeout(()=>v.focus(),50);
+  if(o.photo)$('#fp').onclick=()=>showPhoto(o.photo);
+  $('#fc').onclick=()=>{queue=[];closeLayer();render();};
+  if($('#fskip'))$('#fskip').onclick=()=>{queue.shift();nextInQueue();};
+  if($('#fdel'))$('#fdel').onclick=async()=>{
+    if(!confirm('Diesen Eintrag löschen?'))return;
+    const r=readings.find(x=>x.id===edit);
+    readings=readings.filter(x=>x.id!==edit);
+    if(r&&r.photoId){await kvDel('p_'+r.photoId);delete photoCache[r.photoId];}
+    await saveReadings();closeLayer();render();
+  };
+  $('#fs').onclick=async()=>{
+    const val=parseNum($('#fv').value);
+    if(val==null){alert('Bitte einen Zählerstand eingeben.');return;}
+    const rec={meterId:$('#fm').value,date:$('#fd').value||today(),value:val,note:$('#fn').value.trim(),reset:$('#fr').checked};
+    lastMeterUsed=rec.meterId;selMeter=rec.meterId;
+    if(edit){
+      const r=readings.find(x=>x.id===edit);Object.assign(r,rec);
+    }else{
+      rec.id=uid();rec.created=Date.now();
+      if(o.photo){rec.photoId=uid();await kvSet('p_'+rec.photoId,o.photo);photoCache[rec.photoId]=o.photo;}
+      readings.push(rec);
+    }
+    await saveReadings();
+    if(!edit&&queue.length){queue.shift();nextInQueue();}
+    else{closeLayer();render();}
+  };
+}
+async function editReading(id){
+  const r=readings.find(x=>x.id===id);if(!r)return;
+  const p=await getPhoto(r.photoId);
+  queue=[];
+  form({edit:id,photo:p,meterId:r.meterId,value:r.value,date:r.date,note:r.note,reset:r.reset});
+}
+
+/* ---------- Zähler verwalten ---------- */
+$('#btnMeters').onclick=meterDialog;
+function meterDialog(){
+  let h='<h3>Zähler</h3>';
+  for(const m of meters){
+    h+=`<div class="row2" style="margin-top:8px;align-items:center"><span class="dot" style="--col:${colorOf(m)}"></span>
+      <span style="flex:3;min-width:120px">${esc(m.name)} <span class="mut">(${esc(m.unit)})</span></span>
+      <button class="btn sm" data-ren="${m.id}" style="flex:0">Ändern</button>
+      <button class="btn sm danger" data-del="${m.id}" style="flex:0">✕</button></div>`;
+  }
+  h+=`<label>Neuer Zähler</label><div class="row2" style="margin-top:0"><input type="text" id="nm" placeholder="Name, z. B. Strom FeWo 1" style="flex:3"><input type="text" id="nu" placeholder="Einheit" value="kWh" style="flex:1;min-width:80px"></div>
+  <div class="row2"><button class="btn pri" id="nadd">Zähler hinzufügen</button><button class="btn" id="nclose">Fertig</button></div>`;
+  layer(h);
+  $('#nclose').onclick=()=>{closeLayer();render();};
+  $('#nadd').onclick=async()=>{
+    const n=$('#nm').value.trim(),u=$('#nu').value.trim()||'kWh';if(!n)return;
+    meters.push({id:uid(),name:n,unit:u});await saveMeters();meterDialog();
+  };
+  document.querySelectorAll('[data-ren]').forEach(b=>b.onclick=async()=>{
+    const m=meterById(b.dataset.ren);
+    const n=prompt('Name',m.name);if(n===null)return;
+    const u=prompt('Einheit',m.unit);if(u===null)return;
+    m.name=n.trim()||m.name;m.unit=u.trim()||m.unit;await saveMeters();meterDialog();
+  });
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    const m=meterById(b.dataset.del);
+    const cnt=readings.filter(r=>r.meterId===m.id).length;
+    if(!confirm(`„${m.name}“ löschen${cnt?` inkl. ${cnt} Einträgen und Fotos`:''}?`))return;
+    for(const r of readings.filter(r=>r.meterId===m.id)){if(r.photoId)await kvDel('p_'+r.photoId);}
+    readings=readings.filter(r=>r.meterId!==m.id);meters=meters.filter(x=>x.id!==m.id);
+    await saveMeters();await saveReadings();meterDialog();
+  });
+}
+
+/* ---------- Daten: Export / Backup ---------- */
+$('#btnData').onclick=()=>{
+  layer(`<h3>Daten</h3><div class="tools" style="flex-direction:column">
+    <button class="btn" id="xcsv">📄 Tabelle als CSV (Excel) exportieren</button>
+    <button class="btn" id="xjson">💾 Komplett-Backup inkl. Fotos (JSON)</button>
+    <button class="btn" id="ijson">📥 Backup einspielen (ersetzt alles)</button>
+    <button class="btn" id="xclose">Schließen</button></div>
+    <div class="mut" style="font-size:13px;margin-top:10px">Alle Daten liegen nur in diesem Browser. Ein Backup ab und zu ist sinnvoll.</div>`);
+  $('#xclose').onclick=closeLayer;
+  $('#xcsv').onclick=exportCSV;
+  $('#xjson').onclick=exportJSON;
+  $('#ijson').onclick=()=>$('#imp').click();
+};
+function download(name,text,type){
+  const b=new Blob([text],{type}),u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{a.remove();URL.revokeObjectURL(u);},2000);
+}
+function exportCSV(){
+  const rows=[['Datum','Zähler','Stand','Einheit','Verbrauch','Tage','Verbrauch pro Tag','Zählerwechsel','Notiz']];
+  const n=x=>x==null?'':String(Math.round(x*1000)/1000).replace('.',',');
+  for(const m of meters)for(const r of series(m.id))
+    rows.push([fmtDate(r.date),m.name,n(r.value),m.unit,n(r.diff),r.days??'',n(r.perDay),r.reset?'ja':'',r.note||'']);
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  download('zaehlerstaende.csv','﻿'+csv,'text/csv;charset=utf-8');
+}
+async function exportJSON(){
+  const photos={};
+  for(const r of readings)if(r.photoId){const p=await getPhoto(r.photoId);if(p)photos[r.photoId]=p;}
+  download(`zaehlerstaende-backup-${today()}.json`,JSON.stringify({v:1,meters,readings,photos}),'application/json');
+}
+$('#imp').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const d=JSON.parse(await f.text());
+    if(!Array.isArray(d.meters)||!Array.isArray(d.readings))throw 0;
+    const merge=meters.length&&readings.length&&confirm('OK = zu den vorhandenen Daten HINZUFÜGEN\nAbbrechen = alles durch die Datei ERSETZEN');
+    if(merge){
+      for(const m of d.meters)if(!meters.some(x=>x.id===m.id))meters.push(m);
+      for(const r of d.readings)if(!readings.some(x=>x.id===r.id))readings.push(r);
+    }else{
+      if(!confirm('Alle aktuellen Daten durch die Datei ersetzen?'))return;
+      for(const r of readings)if(r.photoId)await kvDel('p_'+r.photoId);
+      meters=d.meters;readings=d.readings;
+      for(const k in photoCache)delete photoCache[k];
+    }
+    for(const id in (d.photos||{}))await kvSet('p_'+id,d.photos[id]);
+    await saveMeters();await saveReadings();closeLayer();render();
+  }catch(err){alert('Die Datei ist kein gültiges Backup.');}
+};
+
+/* ---------- Start ---------- */
+(async function init(){
+  persistent=await openDB();
+  meters=(await kvGet('meters'))||null;
+  readings=(await kvGet('readings'))||[];
+  if(!meters){
+    meters=[{id:uid(),name:'Strom',unit:'kWh'},{id:uid(),name:'Gas',unit:'m³'},{id:uid(),name:'Wasser',unit:'m³'}];
+    await saveMeters();
+  }
+  selMeter=meters[0].id;
+  render();
+})();
+</script>
+</body>
+</html>
